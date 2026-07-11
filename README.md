@@ -77,7 +77,7 @@ pip install -r requirements.txt
 
 ### Dados (obrigatório)
 
-O XLSX do desafio **não é versionado** — é material da equipe avaliadora e não é boa prática subir dado bruto ao repositório. Antes de rodar o pipeline, coloque o arquivo fornecido pela equipe em `data/raw/`:
+O XLSX de origem **não é versionado** — dado bruto não deve ir para o repositório (boa prática), e a base é distribuída à parte. Antes de rodar o pipeline, coloque o arquivo de origem em `data/raw/`:
 
 ```
 data/raw/base_pre_vestibular_dicionario_amostras.xlsx
