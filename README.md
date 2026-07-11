@@ -17,19 +17,19 @@ Projeto de análise de dados educacionais desenvolvido como solução para o des
 
 ## ⚠️ Escopo dos dados (leia antes de interpretar os resultados)
 
-O arquivo fornecido `data/raw/base_pre_vestibular_dicionario_amostras.xlsx` é um **dicionário de dados + amostra** — **não** a base completa. Isso foi **verificado no próprio arquivo** (via `openpyxl`, contando as linhas de cada aba), não inferido:
+O arquivo fornecido `data/raw/base_pre_vestibular_dicionario_amostras.xlsx` é um **dicionário de dados + amostra** — **não** a base completa. Comparando o número de linhas de cada aba com o total declarado na própria aba `Resumo` do dicionário:
 
-| Tabela | Linhas no XLSX | Base completa (aba `Resumo`) | Situação |
-|---|--:|--:|---|
-| professores | 35 | 35 | ✅ Completa |
-| ofertas_curso | 220 | 220 | ✅ Completa |
-| simulados | 165 | 165 | ✅ Completa |
-| aprovacoes | 354 | 354 | ✅ Completa |
-| estudantes | 500 | 812 | ✂️ Truncada em 500 |
-| matriculas | 500 | 9.452 | ✂️ Truncada em 500 |
-| aulas | 500 | 2.418 | ✂️ Truncada em 500 |
-| resultados_sim | 500 | 21.510 | ✂️ Truncada em 500 |
-| presencas_aulas | 500 | 74.997 | ✂️ Truncada em 500 |
+| Tabela          | Linhas no XLSX | Base completa (aba`Resumo`) | Situação           |
+| --------------- | -------------: | ----------------------------: | -------------------- |
+| professores     |             35 |                            35 | ✅ Completa          |
+| ofertas_curso   |            220 |                           220 | ✅ Completa          |
+| simulados       |            165 |                           165 | ✅ Completa          |
+| aprovacoes      |            354 |                           354 | ✅ Completa          |
+| estudantes      |            500 |                           812 | ✂️ Truncada em 500 |
+| matriculas      |            500 |                         9.452 | ✂️ Truncada em 500 |
+| aulas           |            500 |                         2.418 | ✂️ Truncada em 500 |
+| resultados_sim  |            500 |                        21.510 | ✂️ Truncada em 500 |
+| presencas_aulas |            500 |                        74.997 | ✂️ Truncada em 500 |
 
 Pontos importantes:
 
@@ -40,8 +40,6 @@ Pontos importantes:
 **Consequência para as análises:** os cruzamentos entre matrícula, presença e aprovação têm sobreposição mínima (apenas **1 aluno** possui os três dados). Portanto, o notebook `02_analise.ipynb` entrega uma **demonstração de método**, e não conclusões de negócio.
 
 **Como obter resultados válidos:** basta colocar os CSVs da base completa em `data/` e reexecutar o pipeline — todo o código (`extract` → `cleaning` → `transform`) e os notebooks já estão prontos para recebê-los.
-
-> Reproduzir a verificação: `python -c "import openpyxl; wb=openpyxl.load_workbook('data/raw/base_pre_vestibular_dicionario_amostras.xlsx'); [print(ws.title, ws.max_row) for ws in wb.worksheets]"`
 
 ## 📁 Estrutura do Projeto
 
@@ -94,14 +92,22 @@ python src/transform.py   # -> data/final/*.parquet + *.csv + relatório
 
 ### Notebooks (documentação e análises)
 
+Abra `notebooks/01_tratamento.ipynb` e `notebooks/02_analise.ipynb` de uma destas formas:
+
+- **VS Code** — abra o arquivo `.ipynb`, selecione o kernel (o ambiente `env`) e clique em **Run All**.
+- **Jupyter no navegador** — rode um dos comandos abaixo; ele abre uma aba no navegador, daí é só navegar até a pasta `notebooks/`:
+
 ```bash
-jupyter lab   # abra notebooks/01_tratamento.ipynb e 02_analise.ipynb
+jupyter lab        # interface mais completa
+# ou, mais simples:
+jupyter notebook
 ```
 
 ### Docker
 
 ```bash
-docker-compose up --build   # dashboard em http://localhost:8501 (quando disponível)
+docker compose up --build   # dashboard em http://localhost:8501 (quando disponível)
+# Docker mais antigo (V1): docker-compose up --build
 ```
 
 ## 🔍 Decisões técnicas e analíticas
