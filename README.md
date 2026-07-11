@@ -54,6 +54,8 @@ src/
   extract.py    # Etapa 1: XLSX -> CSV (dtype=str, sem alterar nada)
   cleaning.py   # normalizadores puros + dicionários canônicos
   transform.py  # Etapa 2: tratamento e estruturação da base analítica
+  validation.py # schemas Pandera (contrato da base tratada)
+  queries.py    # camada analítica em SQL (DuckDB) sobre os Parquet
 notebooks/
   01_tratamento.ipynb   # extração, perfilamento e tratamento (documentado)
   02_analise.ipynb      # as 4 análises obrigatórias
@@ -121,6 +123,8 @@ Documentadas em detalhe em `notebooks/01_tratamento.ipynb` e em `data/final/_rel
 - **Duplicidade** → em Aprovações, removem-se as linhas marcadas `chamada = "Cadastro duplicado?"` (coincidem 1:1 com duplicatas por chave de negócio).
 - **Outliers** → nota de simulado fora de `[0, 100]` vira nula; inconsistências de tempo/acertos são sinalizadas, não descartadas.
 - **Faltantes** → medidas (notas) não são imputadas; categóricas viram `"Não informado"` quando faz sentido de negócio.
+- **Validação (Pandera)** → `src/validation.py` define o "contrato" da base tratada (PKs únicas, faixas numéricas e categorias canônicas); o `transform.py` roda a validação e registra o resultado no relatório.
+- **Camada SQL (DuckDB)** → `src/queries.py` responde às perguntas via SQL sobre os Parquet, como alternativa de modelagem analítica às agregações em Pandas.
 
 ## ❓ Perguntas obrigatórias
 
