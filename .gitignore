@@ -11,10 +11,13 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 
-# Dados (ajustar se quiser versionar dados pequenos)
-data/raw/
-data/processed/
-data/final/
+# Dados: não versionar conteúdo, mas manter a estrutura de pastas (.gitkeep)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/final/*
+!data/final/.gitkeep
 
 # Streamlit
 .streamlit/secrets.toml
