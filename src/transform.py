@@ -31,6 +31,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cleaning as cl
+import validation as val
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -251,6 +252,15 @@ def main() -> dict[str, pd.DataFrame]:
         "matriculas": matriculas, "aprovacoes": aprovacoes, "simulados": simulados,
         "resultados_sim": resultados, "aulas": aulas, "presencas_aulas": presencas,
     }
+    rel("\n## Validação da base tratada (Pandera)\n")
+    erros = val.validar(tabelas)
+    if not erros:
+        rel("- ✅ Todas as tabelas passaram: PKs únicas e não-nulas, faixas numéricas "
+            "plausíveis e categorias dentro do conjunto canônico.")
+    else:
+        for t, es in erros.items():
+            rel(f"- ❌ **{t}**: " + "; ".join(es[:5]))
+
     rel("\n## Tabelas geradas\n")
     for nome, df in tabelas.items():
         _salvar(df, nome)
