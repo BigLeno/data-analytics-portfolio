@@ -114,6 +114,35 @@ def fig_materia(df: pd.DataFrame) -> go.Figure:
     return _fig(t, "Nota média em simulados por matéria", x="nota média (0–100)")
 
 
+# --- Insights sobre tabelas completas (conclusões válidas, sem ressalva amostral) ---
+
+def fig_universidades(aprovacoes: pd.DataFrame) -> go.Figure:
+    s = aprovacoes["universidade"].value_counts().sort_values()
+    t = go.Bar(x=s.values, y=s.index, orientation="h", marker_color=BLUE,
+               text=s.values, textposition="outside",
+               hovertemplate="%{y}: %{x} aprovações<extra></extra>")
+    return _fig(t, "Aprovações por universidade", x="nº de aprovações", altura=380)
+
+
+def fig_tipo_vaga(aprovacoes: pd.DataFrame) -> go.Figure:
+    s = aprovacoes["modalidade_vaga"].value_counts()
+    t = go.Bar(x=s.index, y=s.values, marker_color=BLUE, text=s.values, textposition="outside",
+               hovertemplate="%{x}: %{y} aprovações<extra></extra>")
+    return _fig(t, "Aprovações por tipo de vaga", y="nº de aprovações")
+
+
+def fig_modalidade_ano(ofertas: pd.DataFrame) -> go.Figure:
+    mix = pd.crosstab(ofertas["ano"], ofertas["modalidade"])
+    cores = {"Presencial": BLUE, "Híbrido": "#eda100", "Online": "#1baf7a"}
+    traces = [go.Bar(name=c, x=mix.index.astype(int), y=mix[c], marker_color=cores.get(c, MUTED),
+                     hovertemplate=f"{c} %{{x}}: %{{y}} ofertas<extra></extra>")
+              for c in ["Presencial", "Híbrido", "Online"] if c in mix.columns]
+    fig = _fig(traces, "Ofertas por modalidade e ano", y="nº de ofertas")
+    fig.update_layout(barmode="stack", showlegend=True,
+                      legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
+    return fig
+
+
 # --------------------------------------------------------------------------- #
 # Aplicação
 # --------------------------------------------------------------------------- #
@@ -161,9 +190,10 @@ def main() -> None:
     c3.metric("Matrículas", f"{len(base['matriculas']):,}".replace(",", "."))
     c4.metric("Período", f"{int(aprov['ano_vestibular'].min())}–{int(aprov['ano_vestibular'].max())}")
 
-    aba1, aba2, aba3, aba4 = st.tabs([
+    aba1, aba2, aba3, aba4, aba5 = st.tabs([
         "Q1 · Aprovação por ano", "Q2 · Presença × aprovação",
         "Q3 · Desempenho por matéria", "Q4 · Recomendações",
+        "★ Insights (dados completos)",
     ])
 
     with aba1:
@@ -204,6 +234,20 @@ def main() -> None:
             "separar efeitos de turma, matéria e presença."
         )
         st.info("Recomendações derivadas do método; a confirmar na base completa.", icon="🧭")
+
+    with aba5:
+        st.success(
+            "Estas análises usam apenas tabelas **completas** (`aprovacoes`, `ofertas_curso`) — "
+            "valem como **conclusões**, sem a ressalva amostral das abas Q1–Q4.", icon="✅",
+        )
+        of = base["ofertas_curso"]
+        col1, col2 = st.columns(2)
+        col1.plotly_chart(fig_universidades(aprov), use_container_width=True)
+        col2.plotly_chart(fig_tipo_vaga(aprov), use_container_width=True)
+        st.plotly_chart(fig_modalidade_ano(of), use_container_width=True)
+        st.caption("Público majoritariamente cotista (cotas somadas > ampla concorrência), "
+                   "destino concentrado em públicas locais (UECE, UFC) e mix de modalidade "
+                   "que varia por ano sem tendência linear.")
 
 
 if __name__ == "__main__":
