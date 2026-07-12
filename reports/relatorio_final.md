@@ -23,9 +23,11 @@ data/raw (origem)  →  extract.py  →  data/processed (CSV fiel)  →  transfo
 
 - **Extração fiel** — cada aba do arquivo de origem vira CSV lido como texto (`dtype=str`), preservando os valores originais; nada é "limpo" antes da etapa de tratamento.
 - **Tratamento** (`cleaning.py` + `transform.py`) — padronização de datas, categorias, CPF; deduplicação por regra de negócio; conferência de denormalização; tratamento de outliers e faltantes. Cada decisão está documentada em [`notebooks/01_tratamento.ipynb`](../notebooks/01_tratamento.ipynb) e em [`data/final/_relatorio_tratamento.md`](../data/final/_relatorio_tratamento.md).
-- **Análises** — [`notebooks/02_analise.ipynb`](../notebooks/02_analise.ipynb).
+- **Análises** — [`notebooks/02_analise.ipynb`](../notebooks/02_analise.ipynb) (obrigatórias) e [`notebooks/03_insights.ipynb`](../notebooks/03_insights.ipynb) (complementares).
+- **Validação** — a base tratada passa por schemas [`Pandera`](../src/validation.py): PKs únicas, faixas numéricas plausíveis e categorias dentro do conjunto canônico.
+- **Modelagem analítica** — consultas SQL via [`DuckDB`](../src/queries.py) sobre os Parquet e um [dashboard interativo](../dashboard/app.py) em Streamlit.
 
-Stack: Python, Pandas, DuckDB, Pandera, Matplotlib. Detalhes de execução no [`README.md`](../README.md).
+Stack: Python, Pandas, DuckDB, Pandera, Plotly/Matplotlib, Streamlit. Detalhes de execução no [`README.md`](../README.md).
 
 ## 3. Escopo dos dados (leitura obrigatória antes dos resultados)
 
@@ -82,12 +84,29 @@ Derivadas do método; a confirmar na base completa:
 3. **Padronizar a captura de dados na origem.** O volume de inconsistências (datas em 4 formatos, categorias sem padrão, nomes denormalizados, nulos relevantes) indica ganho imediato de qualidade decisória.
 4. **Instrumentar a taxa de aprovação por coorte** (ano de ingresso × ano de vestibular) para separar efeitos de turma, matéria e presença.
 
-## 5. Principais achados
+## 5. Insights complementares (tabelas completas — conclusões válidas)
+
+Além das 4 perguntas (limitadas pelos cruzamentos amostrais), as tabelas que vieram **completas** — `aprovacoes` e `ofertas_curso` — permitem conclusões **sem ressalva**. Detalhe em [`notebooks/03_insights.ipynb`](../notebooks/03_insights.ipynb).
+
+![Aprovações por universidade](img/insight_universidades.png)
+
+![Aprovações por tipo de vaga](img/insight_tipo_vaga.png)
+
+| Achado | Evidência |
+|---|---|
+| **Público majoritariamente cotista** | Cotas somadas (PPI + PCD + escola pública) = **172** > ampla concorrência = **111** |
+| **Destino concentrado em públicas locais** | UECE (60) e UFC (51) lideram as aprovações |
+| **Ingresso diversificado** | Nenhuma via domina (SISU, vestibular próprio, listas: 63–72 cada) |
+| **Cortes comparáveis entre vagas** | Medianas de nota final ~715–735 — cotas **não** têm corte dramaticamente menor |
+| **Preço homogêneo entre matérias** | Médias próximas (~R$ 1.285–1.355); matéria não é o eixo de precificação |
+| **Modalidade instável entre anos** | Sem digitalização linear (2023 teve pico de online; 2024 zerou) |
+
+## 6. Principais achados
 
 - A base exige tratamento não-trivial: foram padronizadas datas, categorias e CPFs; removidas duplicatas sinalizadas em Aprovações; nulificados outliers de nota; e conferida a denormalização de professores contra a dimensão.
 - O material disponível é amostral e por ordem, o que limita cruzamentos entre entidades — **documentado e verificado**, não presumido.
 - O método está pronto e reproduzível: basta a base completa para transformar a demonstração em conclusões acionáveis.
 
-## 6. Conclusão
+## 7. Conclusão
 
 O projeto entrega o ciclo completo — extração fiel, tratamento documentado, base analítica estruturada e as quatro análises — de forma reproduzível e honesta quanto ao escopo dos dados. As recomendações apontam caminhos concretos para a coordenação e ficam prontas para validação assim que a base completa for disponibilizada.
