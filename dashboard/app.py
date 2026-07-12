@@ -52,6 +52,12 @@ def q3_por_materia() -> pd.DataFrame:
     return queries.desempenho_por_materia(FINAL_DIR)
 
 
+@st.cache_data(show_spinner=False)
+def avaliar_modelo() -> dict:
+    import model
+    return model.avaliar(FINAL_DIR)
+
+
 def resumo_presenca(presencas: pd.DataFrame, aprovacoes: pd.DataFrame) -> pd.DataFrame:
     p = presencas.copy()
     p["compareceu"] = p["status_presenca"].isin(["Presente", "Atrasado"])
@@ -143,6 +149,31 @@ def fig_modalidade_ano(ofertas: pd.DataFrame) -> go.Figure:
     return fig
 
 
+# --- Score de propensão (modelo scikit-learn) ---
+
+def fig_importancia(coefs: pd.Series) -> go.Figure:
+    top = coefs.head(10).sort_values()
+    cores = [BLUE if v >= 0 else ORANGE for v in top.values]
+    t = go.Bar(x=top.values, y=top.index, orientation="h", marker_color=cores,
+               hovertemplate="%{y}: %{x:.2f}<extra></extra>")
+    fig = _fig(t, "Coeficientes da regressão logística (↑ aprovação em azul)",
+               x="coeficiente (log-odds)", altura=380)
+    fig.add_vline(x=0, line_color=MUTED, line_width=1)
+    return fig
+
+
+def fig_score_dist(scores: pd.DataFrame) -> go.Figure:
+    ap1 = scores.loc[scores["aprovado"] == 1, "score"]
+    ap0 = scores.loc[scores["aprovado"] == 0, "score"]
+    traces = [go.Histogram(x=ap1, name="Aprovado", marker_color=BLUE, opacity=0.65, nbinsx=12),
+              go.Histogram(x=ap0, name="Não aprovado", marker_color=ORANGE, opacity=0.65, nbinsx=12)]
+    fig = _fig(traces, "Distribuição do score por desfecho real",
+               x="score de propensão (0–1)", y="alunos")
+    fig.update_layout(barmode="overlay", showlegend=True,
+                      legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center"))
+    return fig
+
+
 # --------------------------------------------------------------------------- #
 # Aplicação
 # --------------------------------------------------------------------------- #
@@ -190,10 +221,10 @@ def main() -> None:
     c3.metric("Matrículas", f"{len(base['matriculas']):,}".replace(",", "."))
     c4.metric("Período", f"{int(aprov['ano_vestibular'].min())}–{int(aprov['ano_vestibular'].max())}")
 
-    aba1, aba2, aba3, aba4, aba5 = st.tabs([
+    aba1, aba2, aba3, aba4, aba5, aba6 = st.tabs([
         "Q1 · Aprovação por ano", "Q2 · Presença × aprovação",
         "Q3 · Desempenho por matéria", "Q4 · Recomendações",
-        "★ Insights (dados completos)",
+        "★ Insights (dados completos)", "🧠 Score (ML)",
     ])
 
     with aba1:
@@ -248,6 +279,27 @@ def main() -> None:
         st.caption("Público majoritariamente cotista (cotas somadas > ampla concorrência), "
                    "destino concentrado em públicas locais (UECE, UFC) e mix de modalidade "
                    "que varia por ano sem tendência linear.")
+
+    with aba6:
+        st.warning(
+            "Modelo em **demonstração**: o alvo é confiável (aprovações completas), mas as "
+            "features vêm de tabelas amostrais → nesta amostra o sinal fica **próximo do acaso** "
+            "(AUC ~0,5). O entregável é o *pipeline* interpretável, pronto para a base completa.",
+            icon="⚠️",
+        )
+        m = avaliar_modelo()
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Alunos (com features)", f"{m['n']}")
+        k2.metric("AUC · Regressão logística", f"{m['auc_logit'][0]:.3f}")
+        k3.metric("AUC · Random forest", f"{m['auc_rf'][0]:.3f}")
+        col1, col2 = st.columns(2)
+        col1.plotly_chart(fig_importancia(m["coefs"]), use_container_width=True)
+        col2.plotly_chart(fig_score_dist(m["scores"]), use_container_width=True)
+        st.markdown("**Segmentação por faixa de score** — a faixa ordena a taxa real de aprovação?")
+        st.dataframe(m["segmentacao"], hide_index=True, use_container_width=True)
+        with st.expander("Ver score por aluno"):
+            st.dataframe(m["scores"].sort_values("score", ascending=False),
+                         hide_index=True, use_container_width=True)
 
 
 if __name__ == "__main__":
