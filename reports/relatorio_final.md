@@ -26,6 +26,7 @@ data/raw (origem)  →  extract.py  →  data/processed (CSV fiel)  →  transfo
 - **Análises** — [`notebooks/02_analise.ipynb`](../notebooks/02_analise.ipynb) (obrigatórias) e [`notebooks/03_insights.ipynb`](../notebooks/03_insights.ipynb) (complementares).
 - **Validação** — a base tratada passa por schemas [`Pandera`](../src/validation.py): PKs únicas, faixas numéricas plausíveis e categorias dentro do conjunto canônico.
 - **Modelagem analítica** — consultas SQL via [`DuckDB`](../src/queries.py) sobre os Parquet e um [dashboard interativo](../dashboard/app.py) em Streamlit.
+- **Score preditivo** — pipeline scikit-learn de propensão à aprovação ([`src/features.py`](../src/features.py) + [`notebooks/04_modelo.ipynb`](../notebooks/04_modelo.ipynb)), com alvo confiável; na amostra o sinal é próximo do acaso, mas o pipeline está pronto para a base completa.
 
 Stack: Python, Pandas, DuckDB, Pandera, Plotly/Matplotlib, Streamlit. Detalhes de execução no [`README.md`](../README.md).
 

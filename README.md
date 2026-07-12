@@ -12,6 +12,7 @@ Projeto de análise de dados educacionais desenvolvido como solução para o des
 - **Pandas / NumPy** — Manipulação de dados
 - **DuckDB** — Consultas SQL in-memory
 - **Pandera** — Validação de schema
+- **scikit-learn** — Modelo de propensão (score)
 - **Plotly / Streamlit** — Visualização
 - **Docker** — Ambiente reproduzível
 
@@ -56,10 +57,12 @@ src/
   transform.py  # Etapa 2: tratamento e estruturação da base analítica
   validation.py # schemas Pandera (contrato da base tratada)
   queries.py    # camada analítica em SQL (DuckDB) sobre os Parquet
+  features.py   # engenharia de atributos por aluno (para o modelo)
 notebooks/
   01_tratamento.ipynb   # extração, perfilamento e tratamento (documentado)
   02_analise.ipynb      # as 4 análises obrigatórias
   03_insights.ipynb     # insights complementares sobre as tabelas completas
+  04_modelo.ipynb       # score de propensão à aprovação (scikit-learn)
 dashboard/      # app Streamlit (em desenvolvimento)
 reports/        # relatório final (em desenvolvimento)
 ```
@@ -126,6 +129,7 @@ Documentadas em detalhe em `notebooks/01_tratamento.ipynb` e em `data/final/_rel
 - **Faltantes** → medidas (notas) não são imputadas; categóricas viram `"Não informado"` quando faz sentido de negócio.
 - **Validação (Pandera)** → `src/validation.py` define o "contrato" da base tratada (PKs únicas, faixas numéricas e categorias canônicas); o `transform.py` roda a validação e registra o resultado no relatório.
 - **Camada SQL (DuckDB)** → `src/queries.py` responde às perguntas via SQL sobre os Parquet, como alternativa de modelagem analítica às agregações em Pandas.
+- **Score preditivo (scikit-learn)** → `src/features.py` + `notebooks/04_modelo.ipynb` treinam um score de propensão à aprovação (Pipeline com pré-processamento, validação cruzada e interpretação). O alvo é confiável (aprovações é tabela completa); na amostra o sinal fica próximo do acaso — o entregável é o pipeline, pronto para a base completa.
 
 ## ❓ Perguntas obrigatórias
 
