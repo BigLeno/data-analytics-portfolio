@@ -59,6 +59,7 @@ src/
 notebooks/
   01_tratamento.ipynb   # extração, perfilamento e tratamento (documentado)
   02_analise.ipynb      # as 4 análises obrigatórias
+  03_insights.ipynb     # insights complementares sobre as tabelas completas
 dashboard/      # app Streamlit (em desenvolvimento)
 reports/        # relatório final (em desenvolvimento)
 ```
