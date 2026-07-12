@@ -42,8 +42,8 @@ def extract_sheets(xlsx_path: Path, output_dir: Path) -> dict[str, Path]:
     """
     if not xlsx_path.exists():
         raise FileNotFoundError(
-            f"Arquivo não encontrado: {xlsx_path}\n"
-            "Baixe o XLSX do desafio e coloque em data/raw/"
+            f"Arquivo de origem não encontrado:\n  {xlsx_path}\n\n"
+            f"Coloque '{xlsx_path.name}' em data/raw/ e rode novamente."
         )
 
     meta_dir = output_dir / "_meta"
@@ -85,4 +85,8 @@ def extract_sheets(xlsx_path: Path, output_dir: Path) -> dict[str, Path]:
 
 
 if __name__ == "__main__":
-    extract_sheets(XLSX_PATH, OUTPUT_DIR)
+    try:
+        extract_sheets(XLSX_PATH, OUTPUT_DIR)
+    except FileNotFoundError as erro:
+        print(f"\n❌ {erro}\n")
+        sys.exit(1)

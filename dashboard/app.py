@@ -184,11 +184,18 @@ def main() -> None:
     base = carregar_base()
     if base is None:
         st.title("📊 AprovaEdu Analytics")
-        st.error(
-            "Base tratada não encontrada em `data/final/`.\n\n"
-            "Rode o pipeline antes de abrir o painel:\n\n"
-            "```\npython src/extract.py\npython src/transform.py\n```"
-        )
+        xlsx = BASE_DIR / "data" / "raw" / "base_pre_vestibular_dicionario_amostras.xlsx"
+        if not xlsx.exists():
+            st.error(
+                "**Arquivo de origem ausente.** Coloque "
+                "`base_pre_vestibular_dicionario_amostras.xlsx` em `data/raw/` e rode o pipeline:\n\n"
+                "```\npython src/extract.py\npython src/transform.py\n```"
+            )
+        else:
+            st.error(
+                "Base tratada não encontrada em `data/final/`. Rode o pipeline:\n\n"
+                "```\npython src/extract.py\npython src/transform.py\n```"
+            )
         st.stop()
 
     aprov, pres = base["aprovacoes"], base["presencas_aulas"]
