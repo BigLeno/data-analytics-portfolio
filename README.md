@@ -111,9 +111,11 @@ jupyter notebook
 
 ### Docker
 
+O container **executa o pipeline (extract → transform) e sobe o dashboard automaticamente** — basta o XLSX estar em `data/raw/` (ver *Dados*).
+
 ```bash
-docker compose up --build   # dashboard em http://localhost:8501 (quando disponível)
-# Docker mais antigo (V1): docker-compose up --build
+docker compose up --build   # dashboard em http://localhost:8501
+# Docker V1 antigo: docker-compose up --build
 ```
 
 ## 🔍 Decisões técnicas e analíticas

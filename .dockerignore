@@ -1,0 +1,21 @@
+# Ambientes virtuais e caches (não vão para a imagem)
+env/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Git e IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Saídas regeneráveis pelo pipeline (o container recria)
+data/processed/
+data/final/
+
+# Artefatos locais
+CLAUDE.md
+*.log
