@@ -91,7 +91,9 @@ def fig_aprovacoes(df: pd.DataFrame) -> go.Figure:
     t = go.Bar(x=df["ano"].astype(int), y=df["aprovados"], marker_color=BLUE,
                text=df["aprovados"], textposition="outside",
                hovertemplate="%{x}: %{y} aprovados<extra></extra>")
-    return _fig(t, "Aprovações por ano", y="alunos aprovados")
+    fig = _fig(t, "Aprovações por ano", y="alunos aprovados")
+    fig.update_yaxes(range=[0, df["aprovados"].max() * 1.18])  # folga p/ rótulo não cortar
+    return fig
 
 
 def fig_nota(df: pd.DataFrame) -> go.Figure:
@@ -99,7 +101,9 @@ def fig_nota(df: pd.DataFrame) -> go.Figure:
                    line=dict(color=BLUE, width=2), marker=dict(size=9),
                    text=[f"{v:.0f}" for v in df["nota_media"]], textposition="top center",
                    hovertemplate="%{x}: nota média %{y}<extra></extra>")
-    return _fig(t, "Nota final média por ano", y="pontos")
+    fig = _fig(t, "Nota final média por ano", y="pontos")
+    fig.update_yaxes(range=[df["nota_media"].min() - 12, df["nota_media"].max() + 14])
+    return fig
 
 
 def fig_presenca(resumo: pd.DataFrame) -> go.Figure:
@@ -117,7 +121,9 @@ def fig_materia(df: pd.DataFrame) -> go.Figure:
     t = go.Bar(x=d["nota_media"], y=d["materia"], orientation="h", marker_color=BLUE,
                text=[f"{v:.1f} (n={n})" for v, n in zip(d["nota_media"], d["provas"])],
                textposition="outside", hovertemplate="%{y}: nota média %{x}<extra></extra>")
-    return _fig(t, "Nota média em simulados por matéria", x="nota média (0–100)")
+    fig = _fig(t, "Nota média em simulados por matéria", x="nota média (0–100)")
+    fig.update_xaxes(range=[0, d["nota_media"].max() * 1.35])  # espaço p/ o rótulo "(n=…)"
+    return fig
 
 
 # --- Insights sobre tabelas completas (conclusões válidas, sem ressalva amostral) ---
@@ -127,14 +133,18 @@ def fig_universidades(aprovacoes: pd.DataFrame) -> go.Figure:
     t = go.Bar(x=s.values, y=s.index, orientation="h", marker_color=BLUE,
                text=s.values, textposition="outside",
                hovertemplate="%{y}: %{x} aprovações<extra></extra>")
-    return _fig(t, "Aprovações por universidade", x="nº de aprovações", altura=380)
+    fig = _fig(t, "Aprovações por universidade", x="nº de aprovações", altura=380)
+    fig.update_xaxes(range=[0, s.values.max() * 1.12])
+    return fig
 
 
 def fig_tipo_vaga(aprovacoes: pd.DataFrame) -> go.Figure:
     s = aprovacoes["modalidade_vaga"].value_counts()
     t = go.Bar(x=s.index, y=s.values, marker_color=BLUE, text=s.values, textposition="outside",
                hovertemplate="%{x}: %{y} aprovações<extra></extra>")
-    return _fig(t, "Aprovações por tipo de vaga", y="nº de aprovações")
+    fig = _fig(t, "Aprovações por tipo de vaga", y="nº de aprovações")
+    fig.update_yaxes(range=[0, s.values.max() * 1.18])
+    return fig
 
 
 def fig_modalidade_ano(ofertas: pd.DataFrame) -> go.Figure:

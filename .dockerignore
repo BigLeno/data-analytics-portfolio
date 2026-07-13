@@ -17,5 +17,4 @@ data/processed/
 data/final/
 
 # Artefatos locais
-CLAUDE.md
 *.log

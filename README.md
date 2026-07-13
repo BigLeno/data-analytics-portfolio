@@ -16,6 +16,21 @@ Projeto de análise de dados educacionais desenvolvido como solução para o des
 - **Plotly / Streamlit** — Visualização
 - **Docker** — Ambiente reproduzível
 
+## 🖥️ Demonstração — dashboard
+
+Painel interativo (Streamlit + Plotly) com as 4 análises, os insights complementares e o score de propensão. Para rodar, veja *Como Executar* (ou `docker compose up --build`) e acesse http://localhost:8501.
+
+**Visão geral e análises obrigatórias**
+
+![Visão geral do dashboard](docs/screenshots/01-visao-geral.png)
+![Q2 — Presença × aprovação](docs/screenshots/02-q2-presenca.png)
+![Q3 — Desempenho por matéria](docs/screenshots/03-q3-materia.png)
+
+**Insights (dados completos) e Score preditivo (ML)**
+
+![Insights sobre tabelas completas](docs/screenshots/04-insights.png)
+![Score de propensão à aprovação](docs/screenshots/05-score-ml.png)
+
 ## ⚠️ Escopo dos dados (leia antes de interpretar os resultados)
 
 O arquivo fornecido `data/raw/base_pre_vestibular_dicionario_amostras.xlsx` é um **dicionário de dados + amostra** — **não** a base completa. Comparando o número de linhas de cada aba com o total declarado na própria aba `Resumo` do dicionário:
