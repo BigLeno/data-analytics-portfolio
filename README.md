@@ -35,7 +35,7 @@ Painel interativo (Streamlit + Plotly) com as 4 análises, os insights complemen
 
 O arquivo fornecido `data/raw/base_pre_vestibular_dicionario_amostras.xlsx` é um **dicionário de dados + amostra** — **não** a base completa. Comparando o número de linhas de cada aba com o total declarado na própria aba `Resumo` do dicionário:
 
-| Tabela          | Linhas no XLSX | Base completa (aba`Resumo`) | Situação           |
+| Tabela          | Linhas no XLSX | Base completa (aba `Resumo`) | Situação           |
 | --------------- | -------------: | ----------------------------: | -------------------- |
 | professores     |             35 |                            35 | ✅ Completa          |
 | ofertas_curso   |            220 |                           220 | ✅ Completa          |
@@ -73,13 +73,19 @@ src/
   validation.py # schemas Pandera (contrato da base tratada)
   queries.py    # camada analítica em SQL (DuckDB) sobre os Parquet
   features.py   # engenharia de atributos por aluno (para o modelo)
+  model.py      # pipeline do score de propensão (scikit-learn)
 notebooks/
   01_tratamento.ipynb   # extração, perfilamento e tratamento (documentado)
   02_analise.ipynb      # as 4 análises obrigatórias
   03_insights.ipynb     # insights complementares sobre as tabelas completas
   04_modelo.ipynb       # score de propensão à aprovação (scikit-learn)
-dashboard/      # app Streamlit (em desenvolvimento)
-reports/        # relatório final (em desenvolvimento)
+dashboard/
+  app.py        # dashboard interativo (Streamlit + Plotly)
+reports/
+  relatorio_final.md    # relatório final (respostas + insights)
+  img/          # gráficos usados no relatório
+docs/
+  screenshots/  # prints do dashboard (usados na seção Demonstração)
 ```
 
 > `data/raw`, `data/processed` e `data/final` são ignorados pelo Git; as saídas são regeneráveis pelo pipeline.
@@ -113,7 +119,7 @@ python src/transform.py   # -> data/final/*.parquet + *.csv + relatório
 
 ### Notebooks (documentação e análises)
 
-Abra `notebooks/01_tratamento.ipynb` e `notebooks/02_analise.ipynb` de uma destas formas:
+Abra os notebooks da pasta `notebooks/` (`01_tratamento` a `04_modelo`) de uma destas formas:
 
 - **VS Code** — abra o arquivo `.ipynb`, selecione o kernel (o ambiente `env`) e clique em **Run All**.
 - **Jupyter no navegador** — rode um dos comandos abaixo; ele abre uma aba no navegador, daí é só navegar até a pasta `notebooks/`:
@@ -146,7 +152,7 @@ Documentadas em detalhe em `notebooks/01_tratamento.ipynb` e em `data/final/_rel
 - **Faltantes** → medidas (notas) não são imputadas; categóricas viram `"Não informado"` quando faz sentido de negócio.
 - **Validação (Pandera)** → `src/validation.py` define o "contrato" da base tratada (PKs únicas, faixas numéricas e categorias canônicas); o `transform.py` roda a validação e registra o resultado no relatório.
 - **Camada SQL (DuckDB)** → `src/queries.py` responde às perguntas via SQL sobre os Parquet, como alternativa de modelagem analítica às agregações em Pandas.
-- **Score preditivo (scikit-learn)** → `src/features.py` + `notebooks/04_modelo.ipynb` treinam um score de propensão à aprovação (Pipeline com pré-processamento, validação cruzada e interpretação). O alvo é confiável (aprovações é tabela completa); na amostra o sinal fica próximo do acaso — o entregável é o pipeline, pronto para a base completa.
+- **Score preditivo (scikit-learn)** → `src/features.py` + `src/model.py` + `notebooks/04_modelo.ipynb` treinam um score de propensão à aprovação (Pipeline com pré-processamento, validação cruzada e interpretação). O alvo é confiável (aprovações é tabela completa); na amostra o sinal fica próximo do acaso — o entregável é o pipeline, pronto para a base completa.
 
 ## ❓ Perguntas obrigatórias
 
