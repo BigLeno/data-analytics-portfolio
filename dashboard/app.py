@@ -96,6 +96,16 @@ def fig_aprovacoes(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def fig_taxa(df: pd.DataFrame) -> go.Figure:
+    t = go.Scatter(x=df["ano"].astype(int), y=df["taxa_pct"], mode="lines+markers+text",
+                   line=dict(color=BLUE, width=2), marker=dict(size=9),
+                   text=[f"{v:.1f}%" for v in df["taxa_pct"]], textposition="top center",
+                   hovertemplate="%{x}: taxa %{y}%<extra></extra>")
+    fig = _fig(t, "Taxa de aprovação por ano (aprovados ÷ matriculados)", y="taxa (%)")
+    fig.update_yaxes(range=[0, max(50, df["taxa_pct"].max() + 8)])
+    return fig
+
+
 def fig_nota(df: pd.DataFrame) -> go.Figure:
     t = go.Scatter(x=df["ano"].astype(int), y=df["nota_media"], mode="lines+markers+text",
                    line=dict(color=BLUE, width=2), marker=dict(size=9),
@@ -209,6 +219,8 @@ def main() -> None:
         st.stop()
 
     aprov, pres = base["aprovacoes"], base["presencas_aulas"]
+    # Fonte dos dados: a amostra trazia no máx. 500 estudantes; a base completa traz 812.
+    completa = base["estudantes"]["aluno_id"].nunique() > 500
 
     # ---- Sidebar ----
     with st.sidebar:
@@ -225,12 +237,20 @@ def main() -> None:
 
     # ---- Cabeçalho + escopo ----
     st.title("📊 AprovaEdu Analytics")
-    st.warning(
-        "**Demonstração de método.** Dados amostrais (5 tabelas truncadas em 500 linhas), "
-        "com sobreposição mínima entre matrícula, presença e aprovação. Os números ilustram "
-        "o método — não são conclusões de negócio. Detalhes no `README.md` › *Escopo dos dados*.",
-        icon="⚠️",
-    )
+    if completa:
+        st.success(
+            "**Base completa.** Painel alimentado pelos CSVs integrais (812 estudantes, "
+            "9.452 matrículas, 74.997 presenças) — os números são **conclusões de negócio**. "
+            "A fase amostral está documentada no `README.md` › *Escopo dos dados*.",
+            icon="✅",
+        )
+    else:
+        st.warning(
+            "**Demonstração de método.** Dados amostrais (5 tabelas truncadas em 500 linhas), "
+            "com sobreposição mínima entre matrícula, presença e aprovação. Os números ilustram "
+            "o método — não são conclusões de negócio. Detalhes no `README.md` › *Escopo dos dados*.",
+            icon="⚠️",
+        )
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Estudantes", f"{base['estudantes']['aluno_id'].nunique():,}".replace(",", "."))
@@ -247,18 +267,30 @@ def main() -> None:
     with aba1:
         q1f = q1[q1["ano"].astype(int).isin(anos)] if anos else q1
         col1, col2 = st.columns(2)
-        col1.plotly_chart(fig_aprovacoes(q1f), use_container_width=True)
-        col2.plotly_chart(fig_nota(q1f), use_container_width=True)
-        st.caption("A *taxa* (aprovados ÷ matriculados) exige a base completa — o denominador "
-                   "amostral é truncado. Fonte: consulta SQL (DuckDB).")
+        if completa:
+            col1.plotly_chart(fig_taxa(q1f), use_container_width=True)
+            col2.plotly_chart(fig_nota(q1f), use_container_width=True)
+            st.plotly_chart(fig_aprovacoes(q1f), use_container_width=True)
+            st.caption("A taxa oscila entre ~30% e ~36% sem tendência clara; o volume de "
+                       "aprovados cresce junto com a base de matriculados. Fonte: consulta SQL (DuckDB).")
+        else:
+            col1.plotly_chart(fig_aprovacoes(q1f), use_container_width=True)
+            col2.plotly_chart(fig_nota(q1f), use_container_width=True)
+            st.caption("A *taxa* (aprovados ÷ matriculados) exige a base completa — o denominador "
+                       "amostral é truncado. Fonte: consulta SQL (DuckDB).")
         with st.expander("Ver dados (tabela)"):
             st.dataframe(q1f, hide_index=True, use_container_width=True)
 
     with aba2:
         resumo = resumo_presenca(pres, aprov)
         st.plotly_chart(fig_presenca(resumo), use_container_width=True)
-        st.caption("Direção plausível (aprovados com presença maior), mas amostra ínfima não "
-                   "permite afirmar associação.")
+        if completa:
+            st.caption("Na base completa a presença média é **praticamente idêntica** entre "
+                       "aprovados e não aprovados (~84%) — **não há associação** entre presença "
+                       "e aprovação nestes dados (r≈0, p≈0,86).")
+        else:
+            st.caption("Direção plausível (aprovados com presença maior), mas amostra ínfima não "
+                       "permite afirmar associação.")
         with st.expander("Ver dados (tabela)"):
             st.dataframe(resumo[["grupo", "media_pct", "alunos"]], hide_index=True,
                          use_container_width=True)
@@ -266,28 +298,53 @@ def main() -> None:
     with aba3:
         q3 = q3_por_materia()
         st.plotly_chart(fig_materia(q3), use_container_width=True)
-        st.caption("Ranking ilustrativo — a amostra cobre poucas matérias. Fonte: consulta SQL (DuckDB).")
+        if completa:
+            st.caption("Desempenho **homogêneo** entre as 10 matérias (médias entre ~60,7 e ~62,0) "
+                       "— nenhuma matéria destoa. Fonte: consulta SQL (DuckDB).")
+        else:
+            st.caption("Ranking ilustrativo — a amostra cobre poucas matérias. Fonte: consulta SQL (DuckDB).")
         with st.expander("Ver dados (tabela)"):
             st.dataframe(q3, hide_index=True, use_container_width=True)
 
     with aba4:
         st.subheader("Recomendações para a coordenação")
-        st.markdown(
-            "1. **Monitorar presença como sinal de risco** — acompanhar frequência por "
-            "aluno/turma e acionar quedas.\n"
-            "2. **Reforçar as matérias de menor nota média** em simulados (carga horária, revisões).\n"
-            "3. **Padronizar a captura de dados na origem** — reduz o retrabalho de limpeza e "
-            "melhora a qualidade decisória.\n"
-            "4. **Instrumentar a taxa de aprovação por coorte** (ingresso × vestibular) para "
-            "separar efeitos de turma, matéria e presença."
-        )
-        st.info("Recomendações derivadas do método; a confirmar na base completa.", icon="🧭")
+        if completa:
+            st.markdown(
+                "1. **Não usar presença como preditor de aprovação** — ela é uniformemente alta "
+                "(~84%) e não se associa ao desfecho; monitorá-la vale como gestão, não como alerta.\n"
+                "2. **Incentivar a amplitude de matrículas** — aprovados cursam ~25% mais matérias "
+                "(13,4 vs 10,8 matrículas); pacotes/combos de matérias são a alavanca com sinal.\n"
+                "3. **Usar o score de propensão para priorizar orientação** — a faixa Alta concentra "
+                "62% de aprovação real vs 32% na Baixa; direcionar mentoria às faixas baixas.\n"
+                "4. **Manter o reforço equilibrado entre matérias** — o desempenho é homogêneo "
+                "(60,7–62,0); não há matéria-gargalo que justifique realocação agressiva.\n"
+                "5. **Padronizar a captura de dados na origem** — a base completa trouxe ~10% de "
+                "notas fora de faixa e datas em 4 formatos; qualidade na origem barateia tudo."
+            )
+            st.info("Recomendações sustentadas pela base completa (ver relatório final).", icon="🧭")
+        else:
+            st.markdown(
+                "1. **Monitorar presença como sinal de risco** — acompanhar frequência por "
+                "aluno/turma e acionar quedas.\n"
+                "2. **Reforçar as matérias de menor nota média** em simulados (carga horária, revisões).\n"
+                "3. **Padronizar a captura de dados na origem** — reduz o retrabalho de limpeza e "
+                "melhora a qualidade decisória.\n"
+                "4. **Instrumentar a taxa de aprovação por coorte** (ingresso × vestibular) para "
+                "separar efeitos de turma, matéria e presença."
+            )
+            st.info("Recomendações derivadas do método; a confirmar na base completa.", icon="🧭")
 
     with aba5:
-        st.success(
-            "Estas análises usam apenas tabelas **completas** (`aprovacoes`, `ofertas_curso`) — "
-            "valem como **conclusões**, sem a ressalva amostral das abas Q1–Q4.", icon="✅",
-        )
+        if completa:
+            st.success(
+                "Análises complementares sobre **aprovações** e **ofertas** — perfil de ingresso "
+                "e organização do cursinho.", icon="✅",
+            )
+        else:
+            st.success(
+                "Estas análises usam apenas tabelas **completas** (`aprovacoes`, `ofertas_curso`) — "
+                "valem como **conclusões**, sem a ressalva amostral das abas Q1–Q4.", icon="✅",
+            )
         of = base["ofertas_curso"]
         col1, col2 = st.columns(2)
         col1.plotly_chart(fig_universidades(aprov), use_container_width=True)
@@ -298,12 +355,20 @@ def main() -> None:
                    "que varia por ano sem tendência linear.")
 
     with aba6:
-        st.warning(
-            "Modelo em **demonstração**: o alvo é confiável (aprovações completas), mas as "
-            "features vêm de tabelas amostrais → nesta amostra o sinal fica **próximo do acaso** "
-            "(AUC ~0,5). O entregável é o *pipeline* interpretável, pronto para a base completa.",
-            icon="⚠️",
-        )
+        if completa:
+            st.success(
+                "Score treinado na **base completa** (800 alunos com features): AUC ~0,61 e "
+                "segmentação com poder real — a faixa **Alta** concentra ~62% de aprovação "
+                "contra ~32% na Baixa. Principal fator: **amplitude de matrículas**.",
+                icon="🧠",
+            )
+        else:
+            st.warning(
+                "Modelo em **demonstração**: o alvo é confiável (aprovações completas), mas as "
+                "features vêm de tabelas amostrais → nesta amostra o sinal fica **próximo do acaso** "
+                "(AUC ~0,5). O entregável é o *pipeline* interpretável, pronto para a base completa.",
+                icon="⚠️",
+            )
         m = avaliar_modelo()
         k1, k2, k3 = st.columns(3)
         k1.metric("Alunos (com features)", f"{m['n']}")
