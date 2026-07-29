@@ -28,16 +28,29 @@ def conectar(final_dir: Path = FINAL_DIR) -> duckdb.DuckDBPyConnection:
 
 
 def aprovacoes_por_ano(final_dir: Path = FINAL_DIR) -> pd.DataFrame:
-    """Q1 — aprovados distintos e nota final média por ano."""
+    """Q1 — matriculados, aprovados, taxa de aprovação e nota final média por ano.
+
+    Denominador: alunos distintos matriculados no ano (base elegível).
+    Na amostra o denominador é truncado e a taxa não é confiável; na base
+    completa a coluna taxa_pct responde a Q1 diretamente.
+    """
     con = conectar(final_dir)
     return con.execute(
         """
-        SELECT ano_vestibular                      AS ano,
-               COUNT(DISTINCT aluno_id)            AS aprovados,
-               ROUND(AVG(nota_final_vestibular),1) AS nota_media
-        FROM aprovacoes
-        GROUP BY ano_vestibular
-        ORDER BY ano_vestibular
+        WITH m AS (
+            SELECT ano, COUNT(DISTINCT aluno_id) AS matriculados
+            FROM matriculas GROUP BY ano
+        ), a AS (
+            SELECT ano_vestibular AS ano,
+                   COUNT(DISTINCT aluno_id)            AS aprovados,
+                   ROUND(AVG(nota_final_vestibular),1) AS nota_media
+            FROM aprovacoes GROUP BY ano_vestibular
+        )
+        SELECT a.ano, m.matriculados, a.aprovados,
+               ROUND(100.0 * a.aprovados / m.matriculados, 1) AS taxa_pct,
+               a.nota_media
+        FROM a LEFT JOIN m USING (ano)
+        ORDER BY a.ano
         """
     ).df()
 

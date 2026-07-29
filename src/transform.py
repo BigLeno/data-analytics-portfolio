@@ -61,7 +61,15 @@ def rel(msg: str) -> None:
 
 
 def _ler(nome: str) -> pd.DataFrame:
-    return pd.read_csv(IN_DIR / f"amostra_{nome}.csv", dtype=str, keep_default_na=False)
+    """Lê a tabela extraída: base completa ({nome}.csv) ou amostra (amostra_{nome}.csv)."""
+    completo = IN_DIR / f"{nome}.csv"
+    caminho = completo if completo.exists() else IN_DIR / f"amostra_{nome}.csv"
+    return pd.read_csv(caminho, dtype=str, keep_default_na=False)
+
+
+def fonte_dados() -> str:
+    """'base completa' se os CSVs completos foram extraídos; senão 'amostra'."""
+    return "base completa" if (IN_DIR / "matriculas.csv").exists() else "amostra"
 
 def _int(s: pd.Series) -> pd.Series:
     return cl.to_num(s).round().astype("Int64")
@@ -124,7 +132,12 @@ def clean_matriculas() -> pd.DataFrame:
     df["data_matricula"] = df["data_matricula"].map(cl.parse_data)
     df["bolsa_percentual"] = cl.to_num(df["bolsa_percentual"])
     df["status_matricula"] = df["status_matricula"].map(lambda v: cl.normalizar(v, cl.STATUS_MATRICULA))
-    df["nota_diagnostico"] = cl.to_num(df["nota_diagnostico"])
+    nota_diag = cl.to_num(df["nota_diagnostico"])
+    fora = nota_diag.notna() & ((nota_diag < 0) | (nota_diag > 100))
+    df["nota_diagnostico"] = nota_diag.where(~fora)
+    if fora.any():
+        rel(f"- **Matrículas – outliers de nota_diagnostico:** {int(fora.sum())} notas fora "
+            "de [0,100] convertidas para nula (mesma regra das notas de simulado).")
     df["origem_captacao"] = df["origem_captacao"].map(lambda v: cl.normalizar(v, cl.CANAL))
     return df
 
@@ -234,8 +247,8 @@ def _salvar(df: pd.DataFrame, nome: str) -> None:
 def main() -> dict[str, pd.DataFrame]:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     rel("# Relatório de tratamento — AprovaEdu Analytics\n")
-    rel("Gerado por `src/transform.py`. Correções aplicadas sobre `data/processed/` "
-        "e base tratada salva em `data/final/`.\n")
+    rel(f"Gerado por `src/transform.py` a partir da **{fonte_dados()}**. Correções "
+        "aplicadas sobre `data/processed/` e base tratada salva em `data/final/`.\n")
 
     professores = dedup_pk(clean_professores(), "professor_id", "Professores")
     estudantes = dedup_pk(clean_estudantes(), "aluno_id", "Estudantes")
