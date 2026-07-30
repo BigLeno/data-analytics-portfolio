@@ -18,7 +18,7 @@ Projeto de análise de dados educacionais desenvolvido como solução para o des
 
 ## 🖥️ Demonstração — dashboard
 
-Painel interativo (Streamlit + Plotly) com as 4 análises, os insights complementares e o score de propensão. Para rodar, veja *Como Executar* (ou `docker compose up --build`) e acesse http://localhost:8501.
+Painel interativo (Streamlit + Plotly) com as 4 análises, os insights complementares e o score de propensão — os textos e a taxa de aprovação se adaptam à fonte carregada (amostra ou base completa). Para rodar, veja *Como Executar* (ou `docker compose up --build`) e acesse http://localhost:8501.
 
 **Visão geral e análises obrigatórias**
 
@@ -31,31 +31,26 @@ Painel interativo (Streamlit + Plotly) com as 4 análises, os insights complemen
 ![Insights sobre tabelas completas](docs/screenshots/04-insights.png)
 ![Score de propensão à aprovação](docs/screenshots/05-score-ml.png)
 
-## ⚠️ Escopo dos dados (leia antes de interpretar os resultados)
+## 📦 Escopo dos dados — duas fases
 
-O arquivo fornecido `data/raw/base_pre_vestibular_dicionario_amostras.xlsx` é um **dicionário de dados + amostra** — **não** a base completa. Comparando o número de linhas de cada aba com o total declarado na própria aba `Resumo` do dicionário:
+O projeto foi desenvolvido em **duas fases**, e isso estrutura os entregáveis:
 
-| Tabela          | Linhas no XLSX | Base completa (aba `Resumo`) | Situação           |
-| --------------- | -------------: | ----------------------------: | -------------------- |
-| professores     |             35 |                            35 | ✅ Completa          |
-| ofertas_curso   |            220 |                           220 | ✅ Completa          |
-| simulados       |            165 |                           165 | ✅ Completa          |
-| aprovacoes      |            354 |                           354 | ✅ Completa          |
-| estudantes      |            500 |                           812 | ✂️ Truncada em 500 |
-| matriculas      |            500 |                         9.452 | ✂️ Truncada em 500 |
-| aulas           |            500 |                         2.418 | ✂️ Truncada em 500 |
-| resultados_sim  |            500 |                        21.510 | ✂️ Truncada em 500 |
-| presencas_aulas |            500 |                        74.997 | ✂️ Truncada em 500 |
+**Fase 1 — amostra.** O material inicial era o XLSX `base_pre_vestibular_dicionario_amostras.xlsx` (dicionário + amostra), com as 5 tabelas maiores **truncadas nas primeiras 500 linhas** — fato **verificado** (contagem de linhas × totais da aba `Resumo`) e documentado. Com o corte por ordem de ID, os cruzamentos entre matrícula, presença e aprovação tinham sobreposição mínima (apenas **1 aluno** com os três dados), então as análises dessa fase foram entregues como **demonstração de método**, com as limitações declaradas (notebooks `01`–`04` e [`reports/relatorio_amostra.md`](reports/relatorio_amostra.md)).
 
-Pontos importantes:
+**Fase 2 — base completa.** Os **CSVs integrais** foram disponibilizados depois: 812 estudantes, 9.452 matrículas, 21.510 resultados e 74.997 presenças — totais idênticos aos declarados no dicionário e **integridade referencial de 100%**. O mesmo pipeline rodou **sem mudança de método**, e as análises viraram **conclusões de negócio** (notebook `05` e [`reports/relatorio_final.md`](reports/relatorio_final.md)).
 
-1. **A limitação está no arquivo, não no código.** O `extract.py` lê **todas** as linhas presentes em cada aba (sem `nrows`/`skiprows`); ele extrai 500 porque 500 é o que o arquivo contém. Nenhuma mudança no código faz surgir mais dados.
-2. **É truncamento por ordem, não amostragem aleatória.** Nas tabelas cortadas, os IDs são exatamente os primeiros sequenciais (`M0000001…M0000500`, `R00000001…R00000500`, …). Por isso as tabelas cobrem fatias de entidades quase disjuntas.
-3. **Isso é por design.** A aba `Resumo` declara em cada linha: *"A planilha traz amostra; o CSV contém a base completa"*. A base completa é distribuída **à parte, como CSVs**.
+### Da amostra à base completa — o que mudou
 
-**Consequência para as análises:** os cruzamentos entre matrícula, presença e aprovação têm sobreposição mínima (apenas **1 aluno** possui os três dados). Portanto, o notebook `02_analise.ipynb` entrega uma **demonstração de método**, e não conclusões de negócio.
+| Dimensão | Fase 1 (amostra) | Fase 2 (base completa) |
+|---|---|---|
+| Alunos com matrícula + presença + aprovação | 1 | **306 (todos os aprovados)** |
+| Q1 · taxa de aprovação | incalculável (denominador truncado) | **30–36% ao ano, estável** |
+| Q2 · presença × aprovação | "não afirmável" (n ínfimo) | **sem associação (r≈0)** — a cautela da Fase 1 se confirmou |
+| Q3 · matérias | 2 visíveis | **10, desempenho homogêneo (60,7–62,0)** |
+| Score ML (AUC) | ~0,51 (acaso) | **~0,61**; faixa Alta com 62% de aprovação real |
+| Validação (Pandera) | regras passando | **capturou outlier novo** (nota_diagnostico > 100) |
 
-**Como obter resultados válidos:** basta colocar os CSVs da base completa em `data/` e reexecutar o pipeline — todo o código (`extract` → `cleaning` → `transform`) e os notebooks já estão prontos para recebê-los.
+> O ponto central: **nenhuma linha de método mudou entre as fases** — só a fonte dos dados. A honestidade da Fase 1 (declarar o que a amostra não sustentava) foi validada pela Fase 2: a diferença de presença que parecia existir na amostra era ruído.
 
 ## 📁 Estrutura do Projeto
 
@@ -75,15 +70,17 @@ src/
   features.py   # engenharia de atributos por aluno (para o modelo)
   model.py      # pipeline do score de propensão (scikit-learn)
 notebooks/
-  01_tratamento.ipynb   # extração, perfilamento e tratamento (documentado)
-  02_analise.ipynb      # as 4 análises obrigatórias
-  03_insights.ipynb     # insights complementares sobre as tabelas completas
-  04_modelo.ipynb       # score de propensão à aprovação (scikit-learn)
+  01_tratamento.ipynb        # Fase 1: extração, perfilamento e tratamento
+  02_analise.ipynb           # Fase 1: as 4 análises (demonstração de método)
+  03_insights.ipynb          # Fase 1: insights sobre as tabelas já completas
+  04_modelo.ipynb            # Fase 1: score de propensão (pipeline de ML)
+  05_analise_completa.ipynb  # Fase 2: análise definitiva na base completa
 dashboard/
-  app.py        # dashboard interativo (Streamlit + Plotly)
+  app.py        # dashboard interativo (Streamlit + Plotly); detecta a fonte dos dados
 reports/
-  relatorio_final.md    # relatório final (respostas + insights)
-  img/          # gráficos usados no relatório
+  relatorio_final.md    # relatório definitivo (base completa)
+  relatorio_amostra.md  # registro da fase amostral (Fase 1)
+  img/          # gráficos usados nos relatórios
 docs/
   screenshots/  # prints do dashboard (usados na seção Demonstração)
 ```
@@ -102,11 +99,10 @@ pip install -r requirements.txt
 
 ### Dados (obrigatório)
 
-O XLSX de origem **não é versionado** — dado bruto não deve ir para o repositório (boa prática), e a base é distribuída à parte. Antes de rodar o pipeline, coloque o arquivo de origem em `data/raw/`:
+Os dados brutos **não são versionados** (boa prática) — são distribuídos à parte. Coloque em `data/raw/` **uma** das fontes; o `extract.py` detecta automaticamente a melhor disponível:
 
-```
-data/raw/base_pre_vestibular_dicionario_amostras.xlsx
-```
+- **Base completa (preferida):** os 9 CSVs (`professores.csv`, `estudantes.csv`, `ofertas_curso.csv`, `matriculas.csv`, `aprovacoes_vestibular.csv`, `simulados.csv`, `resultados_simulados.csv`, `aulas.csv`, `presencas_aulas.csv`);
+- **Amostra:** o XLSX `base_pre_vestibular_dicionario_amostras.xlsx` (dicionário + amostras).
 
 As pastas `data/processed/` e `data/final/` são criadas automaticamente pelo pipeline.
 
@@ -152,13 +148,13 @@ Documentadas em detalhe em `notebooks/01_tratamento.ipynb` e em `data/final/_rel
 - **Faltantes** → medidas (notas) não são imputadas; categóricas viram `"Não informado"` quando faz sentido de negócio.
 - **Validação (Pandera)** → `src/validation.py` define o "contrato" da base tratada (PKs únicas, faixas numéricas e categorias canônicas); o `transform.py` roda a validação e registra o resultado no relatório.
 - **Camada SQL (DuckDB)** → `src/queries.py` responde às perguntas via SQL sobre os Parquet, como alternativa de modelagem analítica às agregações em Pandas.
-- **Score preditivo (scikit-learn)** → `src/features.py` + `src/model.py` + `notebooks/04_modelo.ipynb` treinam um score de propensão à aprovação (Pipeline com pré-processamento, validação cruzada e interpretação). O alvo é confiável (aprovações é tabela completa); na amostra o sinal fica próximo do acaso — o entregável é o pipeline, pronto para a base completa.
+- **Score preditivo (scikit-learn)** → `src/features.py` + `src/model.py` treinam um score de propensão à aprovação (Pipeline com pré-processamento, validação cruzada e interpretação). Na base completa: AUC ~0,61 e segmentação com poder real (faixa Alta: 62% de aprovação vs 32% na Baixa).
 
 ## ❓ Perguntas obrigatórias
 
-Respondidas em `notebooks/02_analise.ipynb` (como demonstração de método — ver *Escopo dos dados*):
+Respondidas **com conclusões** em `notebooks/05_analise_completa.ipynb` e em [`reports/relatorio_final.md`](reports/relatorio_final.md) (base completa). Resumo:
 
-1. Evolução da taxa de aprovação ao longo dos anos.
-2. Relação entre presença nas aulas e aprovação no vestibular.
-3. Cursos/matérias com melhor desempenho.
-4. Recomendações práticas para a coordenação.
+1. **Taxa de aprovação por ano** — oscila entre ~30% e ~36%, sem tendência: a rede cresceu em matriculados, mas a conversão ficou estável.
+2. **Presença × aprovação** — sem associação (84,0% vs 84,0%; r≈0): presença é uniformemente alta e não discrimina o desfecho.
+3. **Desempenho por matéria** — homogêneo (médias 60,7–62,0 nas 10 matérias); sem matéria-gargalo.
+4. **Recomendações** — incentivar amplitude de matrículas (único fator com sinal: aprovados cursam ~25% mais matérias), usar o score de propensão para priorizar orientação, e padronizar a captura de dados na origem.
