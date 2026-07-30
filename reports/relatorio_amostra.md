@@ -1,4 +1,9 @@
-# Relatório Final — AprovaEdu Analytics
+# Relatório da Fase Amostral — AprovaEdu Analytics
+
+> **⚠️ Documento histórico (Fase 1).** Este relatório foi produzido quando apenas a
+> **amostra** dos dados estava disponível (tabelas grandes truncadas em 500 linhas) e
+> tem valor de registro metodológico. Com a base completa disponibilizada depois, a
+> análise definitiva está em [`relatorio_final.md`](relatorio_final.md).
 
 Análise de dados de uma rede de cursinhos pré-vestibular (2021–2025): tratamento da base, indicadores e recomendações para a coordenação pedagógica.
 
@@ -51,7 +56,7 @@ Como o corte é **por ordem** (primeiros IDs sequenciais), as tabelas cobrem con
 
 ### Q1 — Evolução da taxa de aprovação por ano
 
-A taxa de aprovação seria `aprovados(ano) ÷ base elegível(ano)`, usando como base os alunos matriculados no ano. Na amostra o denominador está truncado (6–15 matriculados/ano contra 50–80 aprovados), então reportamos dois sinais válidos no recorte: **volume de aprovações** e **nota final média** por ano.
+A taxa de aprovação seria `aprovados(ano) ÷ base elegível(ano)`, usando como base os alunos matriculados no ano. Na amostra o denominador está truncado (6–15 matriculados/ano contra 50–80 aprovados), então reporto dois sinais válidos no recorte: **volume de aprovações** e **nota final média** por ano.
 
 ![Aprovações e nota final por ano](img/q1_aprovacoes_por_ano.png)
 
@@ -62,7 +67,7 @@ Na base completa, a métrica-chave passa a ser a **taxa** (aprovados ÷ matricul
 
 ### Q2 — Presença nas aulas × aprovação
 
-Para cada aluno calculamos a **taxa de presença** (aulas com status *Presente*/*Atrasado* ÷ total de registros) e comparamos entre quem foi aprovado e quem não foi.
+Para cada aluno calculei a **taxa de presença** (aulas com status *Presente*/*Atrasado* ÷ total de registros) e comparei entre quem foi aprovado e quem não foi.
 
 ![Presença média por desfecho](img/q2_presenca_x_aprovacao.png)
 
