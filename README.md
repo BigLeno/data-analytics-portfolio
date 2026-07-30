@@ -75,6 +75,7 @@ notebooks/
   03_insights.ipynb          # Fase 1: insights sobre as tabelas já completas
   04_modelo.ipynb            # Fase 1: score de propensão (pipeline de ML)
   05_analise_completa.ipynb  # Fase 2: análise definitiva na base completa
+  06_persistencia.ipynb      # Fase 2: persistência/retenção como alavanca nº 1
 dashboard/
   app.py        # dashboard interativo (Streamlit + Plotly); detecta a fonte dos dados
 reports/
@@ -157,4 +158,4 @@ Respondidas **com conclusões** em `notebooks/05_analise_completa.ipynb` e em [`
 1. **Taxa de aprovação por ano** — oscila entre ~30% e ~36%, sem tendência: a rede cresceu em matriculados, mas a conversão ficou estável.
 2. **Presença × aprovação** — sem associação (84,0% vs 84,0%; r≈0): presença é uniformemente alta e não discrimina o desfecho.
 3. **Desempenho por matéria** — homogêneo (médias 60,7–62,0 nas 10 matérias); sem matéria-gargalo.
-4. **Recomendações** — incentivar amplitude de matrículas (único fator com sinal: aprovados cursam ~25% mais matérias), usar o score de propensão para priorizar orientação, e padronizar a captura de dados na origem.
+4. **Recomendações** — **retenção é a alavanca nº 1**: a chance de aprovação eventual salta de 31,6% (1 ano) para 54,6% (2 anos) e 87,5% (3 anos); o aparente efeito do "nº de matrículas" era proxy da permanência (`06_persistencia.ipynb`). Complementam: score de propensão para priorizar orientação e padronização da captura de dados na origem.

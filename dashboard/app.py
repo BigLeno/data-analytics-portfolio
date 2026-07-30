@@ -171,6 +171,20 @@ def fig_modalidade_ano(ofertas: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def fig_persistencia(matriculas: pd.DataFrame, aprovacoes: pd.DataFrame) -> go.Figure:
+    alunos = matriculas.groupby("aluno_id").agg(anos=("ano", "nunique"))
+    alunos["aprovado"] = alunos.index.isin(set(aprovacoes["aluno_id"]))
+    p = alunos.groupby("anos")["aprovado"].agg(taxa="mean", n="count")
+    t = go.Bar(x=[f"{int(a)} ano{'s' if a > 1 else ''}" for a in p.index],
+               y=(p["taxa"] * 100).round(1), marker_color=BLUE,
+               text=[f"{v*100:.1f}% (n={n})" for v, n in zip(p["taxa"], p["n"])],
+               textposition="outside",
+               hovertemplate="%{x}: %{y}% de aprovação<extra></extra>")
+    fig = _fig(t, "Taxa de aprovação por anos de permanência", y="taxa de aprovação (%)")
+    fig.update_yaxes(range=[0, 105])
+    return fig
+
+
 # --- Score de propensão (modelo scikit-learn) ---
 
 def fig_importancia(coefs: pd.Series) -> go.Figure:
@@ -312,18 +326,21 @@ def main() -> None:
         st.subheader("Recomendações para a coordenação")
         if completa:
             st.markdown(
-                "1. **Não usar presença como preditor de aprovação** — ela é uniformemente alta "
+                "1. **Retenção é a alavanca nº 1** — a chance de aprovação eventual salta de "
+                "31,6% (1 ano) para 54,6% (2 anos) e 87,5% (3 anos); priorizar rematrícula, "
+                "pacotes plurianuais e contato ativo com quem encerra o ano sem aprovação.\n"
+                "2. **Não usar presença como preditor de aprovação** — ela é uniformemente alta "
                 "(~84%) e não se associa ao desfecho; monitorá-la vale como gestão, não como alerta.\n"
-                "2. **Incentivar a amplitude de matrículas** — aprovados cursam ~25% mais matérias "
-                "(13,4 vs 10,8 matrículas); pacotes/combos de matérias são a alavanca com sinal.\n"
                 "3. **Usar o score de propensão para priorizar orientação** — a faixa Alta concentra "
                 "62% de aprovação real vs 32% na Baixa; direcionar mentoria às faixas baixas.\n"
-                "4. **Manter o reforço equilibrado entre matérias** — o desempenho é homogêneo "
-                "(60,7–62,0); não há matéria-gargalo que justifique realocação agressiva.\n"
+                "4. **Manter o reforço equilibrado entre matérias** — desempenho homogêneo "
+                "(60,7–62,0); e empilhar matérias no mesmo ano não faz diferença (o volume de "
+                "matrículas só refletia a permanência).\n"
                 "5. **Padronizar a captura de dados na origem** — a base completa trouxe ~10% de "
                 "notas fora de faixa e datas em 4 formatos; qualidade na origem barateia tudo."
             )
-            st.info("Recomendações sustentadas pela base completa (ver relatório final).", icon="🧭")
+            st.info("Recomendações sustentadas pela base completa (ver relatório final e "
+                    "notebook 06 — persistência).", icon="🧭")
         else:
             st.markdown(
                 "1. **Monitorar presença como sinal de risco** — acompanhar frequência por "
@@ -348,6 +365,11 @@ def main() -> None:
                 "valem como **conclusões**, sem a ressalva amostral das abas Q1–Q4.", icon="✅",
             )
         of = base["ofertas_curso"]
+        if completa:
+            st.plotly_chart(fig_persistencia(base["matriculas"], aprov), use_container_width=True)
+            st.caption("**Persistência é o fator nº 1**: a chance de aprovação eventual salta de "
+                       "31,6% (1 ano) para 87,5% (3 anos) — parte é efeito de mais tentativas, "
+                       "mas o 3º ano excede o esperado mecânico em ~20 p.p. (notebook 06).")
         col1, col2 = st.columns(2)
         col1.plotly_chart(fig_universidades(aprov), use_container_width=True)
         col2.plotly_chart(fig_tipo_vaga(aprov), use_container_width=True)
@@ -361,7 +383,8 @@ def main() -> None:
             st.success(
                 "Score treinado na **base completa** (800 alunos com features): AUC ~0,61 e "
                 "segmentação com poder real — a faixa **Alta** concentra ~62% de aprovação "
-                "contra ~32% na Baixa. Principal fator: **amplitude de matrículas**.",
+                "contra ~32% na Baixa. Principal fator: **permanência** (o nº de matrículas, "
+                "coeficiente dominante, é reflexo dos anos cursados — ver notebook 06).",
                 icon="🧠",
             )
         else:

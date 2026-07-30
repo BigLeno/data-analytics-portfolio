@@ -25,7 +25,7 @@ data/raw (CSVs completos)  →  extract.py  →  data/processed  →  transform.
 
 - **Tratamento** — datas em formatos mistos → ISO; categorias normalizadas por dicionário canônico; deduplicação por regra de negócio (15 registros `"Cadastro duplicado?"` removidos de Aprovações); outliers de nota fora de [0,100] nulificados (2.101 em resultados de simulado — ~10% — e 9 em notas de diagnóstico); denormalização de professores conferida contra a dimensão. Detalhes: [`data/final/_relatorio_tratamento.md`](../data/final/_relatorio_tratamento.md).
 - **Validação** — schemas [Pandera](../src/validation.py) (PKs únicas, faixas, categorias canônicas). O contrato **capturou automaticamente** um problema novo da base completa (notas de diagnóstico > 100) que não existia na amostra.
-- **Análises** — [`notebooks/05_analise_completa.ipynb`](../notebooks/05_analise_completa.ipynb) (definitiva) e camada SQL via [DuckDB](../src/queries.py).
+- **Análises** — [`notebooks/05_analise_completa.ipynb`](../notebooks/05_analise_completa.ipynb) (definitiva), [`notebooks/06_persistencia.ipynb`](../notebooks/06_persistencia.ipynb) (persistência e retenção) e camada SQL via [DuckDB](../src/queries.py).
 - **Score preditivo** — pipeline scikit-learn ([`src/model.py`](../src/model.py)).
 
 Stack: Python, Pandas, DuckDB, Pandera, scikit-learn, Plotly/Matplotlib, Streamlit, Docker.
@@ -64,20 +64,24 @@ Taxa = aprovados distintos no ano ÷ alunos distintos matriculados no ano.
 
 ### Q4 — Recomendações para a coordenação
 
-Antes das recomendações, o achado que as sustenta: **o que diferencia os aprovados?** Notas de simulado (61,1 vs 61,4), diagnóstico (58,2 vs 57,9), presença e escola de origem **não diferem** entre grupos. O único fator com sinal claro é a **amplitude de matrículas** — aprovados cursam em média **13,4 matérias vs 10,8** (~25% a mais):
+Antes das recomendações, o achado que as sustenta: **o que diferencia os aprovados?** Notas de simulado (61,1 vs 61,4), diagnóstico (58,2 vs 57,9), presença e escola de origem **não diferem** entre grupos. À primeira vista, o fator com sinal é o volume de matrículas (13,4 vs 10,8) — mas a análise de persistência ([`notebooks/06_persistencia.ipynb`](../notebooks/06_persistencia.ipynb)) mostra que ele é **um disfarce do fator real: a permanência**.
 
-![Nº de matrículas por desfecho](img/fator_matriculas.png)
+![Taxa de aprovação por anos de permanência](img/persistencia_taxa.png)
 
-E o **score de propensão** (regressão logística, validação cruzada) confirma o poder de priorização: AUC ~0,61 e a faixa **Alta** concentra **62% de aprovação real** contra **32%** na Baixa.
+**A taxa de aprovação salta de 31,6% (1 ano) para 54,6% (2 anos) e 87,5% (3 anos).** Dois cuidados de leitura, verificados: (1) parte do ganho é mecânica — mais anos = mais tentativas de vestibular; comparando com o benchmark `1−(1−p)^k`, o 2º ano fica no esperado mecânico, mas o **3º ano excede em ~20 p.p.** (88% vs 68%), indicando ganho real acumulado (ressalva: n=24); (2) o volume de matrículas **não separa** aprovados dentro do mesmo nº de anos (9,2 vs 9,2 em quem cursou 1 ano) — era proxy da permanência.
+
+![Aprovação observada × esperada por repetição de tentativas](img/persistencia_mecanico.png)
+
+E o **score de propensão** (regressão logística, validação cruzada) transforma o sinal em priorização: AUC ~0,61 e a faixa **Alta** concentra **62% de aprovação real** contra **32%** na Baixa.
 
 **Recomendações:**
 
-1. **Não tratar presença como preditor de aprovação** — é uniformemente alta (~84%) e não se associa ao desfecho; vale como gestão operacional, não como alerta de risco.
-2. **Incentivar a amplitude de matrículas** — o único fator com sinal; testar pacotes/combos de matérias e acompanhar alunos com poucas matrículas.
+1. **Retenção é a alavanca nº 1.** Reter o aluno para um 2º/3º ano multiplica a chance de aprovação eventual (31,6% → 54,6% → 87,5%). Ações: pacotes plurianuais, contato ativo com quem encerra o ano sem aprovação, condições de rematrícula.
+2. **Não tratar presença como preditor de aprovação** — é uniformemente alta (~84%) e não se associa ao desfecho; vale como gestão operacional, não como alerta de risco.
 3. **Usar o score de propensão para priorizar orientação** — direcionar mentoria às faixas baixas (32% de aprovação) e entender o que a faixa alta (62%) faz de diferente.
-4. **Manter o investimento equilibrado entre matérias** — desempenho homogêneo; melhoria deve ser transversal.
+4. **Manter o investimento equilibrado entre matérias** — desempenho homogêneo; melhoria deve ser transversal. (E não empilhar matérias no mesmo ano: o volume de matrículas, controlada a permanência, não faz diferença.)
 5. **Padronizar a captura de dados na origem** — ~10% das notas de simulado fora da faixa válida, datas em 4 formatos, campos denormalizados; qualidade na origem barateia todo o ciclo analítico.
-6. **Instrumentar a taxa de aprovação por coorte como KPI permanente** — a taxa está estável enquanto a rede cresce; a próxima alavanca é eficiência, não volume.
+6. **Instrumentar a taxa de aprovação por coorte como KPI permanente** — a taxa está estável enquanto a rede cresce; a próxima alavanca é eficiência, não volume. A coorte também separa o efeito-seleção do efeito-aprendizado na persistência.
 
 ## 4. Perfil de ingresso (análises complementares)
 
@@ -111,4 +115,4 @@ O ponto central: **nenhuma linha de método precisou mudar** — apenas a fonte 
 
 ## 6. Conclusão
 
-A rede cresceu em matriculados, mas converte de forma estável (~1 aprovação a cada 3 matriculados). Presença e notas internas não explicam a aprovação; a **amplitude de matrículas** é o fator com sinal e o **score de propensão** já permite priorizar a orientação pedagógica. As recomendações apontam a próxima alavanca da coordenação: **eficiência de conversão**, sustentada por dados capturados com mais qualidade na origem.
+A rede cresceu em matriculados, mas converte de forma estável (~1 aprovação a cada 3 matriculados). Presença e notas internas não explicam a aprovação; o fator com sinal real é a **permanência** — a chance de aprovação eventual salta de 31,6% para 87,5% entre o 1º e o 3º ano — e o **score de propensão** já permite priorizar a orientação pedagógica. As recomendações apontam a próxima alavanca da coordenação: **reter para converter**, com dados capturados com mais qualidade na origem para sustentar a gestão por coortes.
