@@ -103,6 +103,7 @@ def fig_taxa(df: pd.DataFrame) -> go.Figure:
                    hovertemplate="%{x}: taxa %{y}%<extra></extra>")
     fig = _fig(t, "Taxa de aprovação por ano (aprovados ÷ matriculados)", y="taxa (%)")
     fig.update_yaxes(range=[0, max(50, df["taxa_pct"].max() + 8)])
+    fig.update_xaxes(tickmode="linear", dtick=1)  # anos inteiros (evita 2021.5)
     return fig
 
 
@@ -113,6 +114,7 @@ def fig_nota(df: pd.DataFrame) -> go.Figure:
                    hovertemplate="%{x}: nota média %{y}<extra></extra>")
     fig = _fig(t, "Nota final média por ano", y="pontos")
     fig.update_yaxes(range=[df["nota_media"].min() - 12, df["nota_media"].max() + 14])
+    fig.update_xaxes(tickmode="linear", dtick=1)  # anos inteiros (evita 2021.5)
     return fig
 
 
