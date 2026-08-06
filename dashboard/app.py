@@ -58,6 +58,12 @@ def avaliar_modelo() -> dict:
     return model.avaliar(FINAL_DIR)
 
 
+@st.cache_data(show_spinner=False)
+def importancia_modelo() -> pd.DataFrame:
+    import model
+    return model.importancia_variaveis(FINAL_DIR)
+
+
 def resumo_presenca(presencas: pd.DataFrame, aprovacoes: pd.DataFrame) -> pd.DataFrame:
     p = presencas.copy()
     p["compareceu"] = p["status_presenca"].isin(["Presente", "Atrasado"])
@@ -194,6 +200,18 @@ def fig_importancia(coefs: pd.Series) -> go.Figure:
                hovertemplate="%{y}: %{x:.2f}<extra></extra>")
     fig = _fig(t, "Coeficientes da regressão logística (↑ aprovação em azul)",
                x="coeficiente (log-odds)", altura=380)
+    fig.add_vline(x=0, line_color=MUTED, line_width=1)
+    return fig
+
+
+def fig_importancia_perm(imp: pd.DataFrame) -> go.Figure:
+    d = imp.sort_values("queda_auc")
+    cores = [BLUE if v > 0.01 else MUTED for v in d["queda_auc"]]
+    t = go.Bar(x=d["queda_auc"], y=d["variavel"], orientation="h", marker_color=cores,
+               error_x=dict(type="data", array=d["desvio"], color=INK, thickness=1),
+               hovertemplate="%{y}: queda de %{x:.3f} no AUC<extra></extra>")
+    fig = _fig(t, "Importância por permutação (queda de AUC ao embaralhar a variável)",
+               x="queda no AUC", altura=380)
     fig.add_vline(x=0, line_color=MUTED, line_width=1)
     return fig
 
@@ -402,6 +420,11 @@ def main() -> None:
         col1, col2 = st.columns(2)
         col1.plotly_chart(fig_importancia(m["coefs"]), use_container_width=True)
         col2.plotly_chart(fig_score_dist(m["scores"]), use_container_width=True)
+        st.plotly_chart(fig_importancia_perm(importancia_modelo()), use_container_width=True)
+        st.caption("**Importância formal de cada variável**: embaralho uma variável por vez e "
+                   "meço quanto o AUC cai. `n_matriculas` (proxy da permanência) carrega quase "
+                   "todo o sinal; `taxa_presenca` e `nota_sim_media` têm importância ≈ zero — "
+                   "confirmação formal, no modelo, dos achados de Q2 e Q3.")
         st.markdown("**Segmentação por faixa de score** — a faixa ordena a taxa real de aprovação?")
         st.dataframe(m["segmentacao"], hide_index=True, use_container_width=True)
         with st.expander("Ver score por aluno"):
