@@ -74,6 +74,10 @@ Antes das recomendações, o achado que as sustenta: **o que diferencia os aprov
 
 E o **score de propensão** (regressão logística, validação cruzada) transforma o sinal em priorização: AUC ~0,61 e a faixa **Alta** concentra **62% de aprovação real** contra **32%** na Baixa.
 
+A **importância formal de cada variável** (por permutação: quanto o AUC cai ao embaralhá-la) confirma o quadro em um único gráfico — `n_matriculas` (o proxy da permanência) responde sozinha por quase todo o sinal do modelo (queda de ~0,18, mais de 8× a segunda colocada), enquanto `taxa_presenca` e `nota_sim_media` têm importância **zero**, corroborando formalmente os achados de Q2 e Q3:
+
+![Importância das variáveis por permutação](img/importancia_variaveis.png)
+
 **Recomendações:**
 
 1. **Retenção é a alavanca nº 1.** Reter o aluno para um 2º/3º ano multiplica a chance de aprovação eventual (31,6% → 54,6% → 87,5%). Ações: pacotes plurianuais, contato ativo com quem encerra o ano sem aprovação, condições de rematrícula.

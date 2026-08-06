@@ -76,6 +76,28 @@ def avaliar(final_dir: Path = ft.FINAL_DIR) -> dict:
     }
 
 
+def importancia_variaveis(final_dir: Path = ft.FINAL_DIR, n_repeats: int = 30) -> pd.DataFrame:
+    """Importância de cada variável por permutação (queda de AUC ao embaralhá-la).
+
+    Embaralhar uma variável destrói sua relação com o alvo; a queda no AUC mede
+    quanto o modelo dependia dela. Vantagem sobre coeficientes: opera na variável
+    ORIGINAL (categóricas inteiras, não colunas one-hot) e independe de escala.
+    """
+    from sklearn.inspection import permutation_importance
+
+    dados = ft.construir_features(final_dir)
+    X, y = dados[ft.NUMERICAS + ft.CATEGORICAS], dados[ft.ALVO]
+    logit, _ = pipelines()
+    logit.fit(X, y)
+    r = permutation_importance(logit, X, y, scoring="roc_auc",
+                               n_repeats=n_repeats, random_state=42)
+    return (pd.DataFrame({
+        "variavel": X.columns,
+        "queda_auc": r.importances_mean.round(4),
+        "desvio": r.importances_std.round(4),
+    }).sort_values("queda_auc", ascending=False).reset_index(drop=True))
+
+
 if __name__ == "__main__":
     r = avaliar()
     print(f"n={r['n']} | positivos={r['positivos']}")
