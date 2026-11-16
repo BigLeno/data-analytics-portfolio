@@ -95,6 +95,11 @@ SOBRENOMES = ["Almeida", "Barbosa", "Cardoso", "Dias", "Esteves", "Freitas", "Go
               "Moreira", "Nogueira", "Oliveira", "Pereira", "Queiroz", "Rocha", "Sampaio", "Teixeira", "Vieira"]
 
 
+def _somar_dias(ts: pd.Timestamp, dias: int) -> pd.Timestamp:
+    """Soma dias pelo ordinal (evita aritmética de timedelta do NumPy)."""
+    return pd.Timestamp.fromordinal(ts.toordinal() + dias)
+
+
 def _ascii(texto: str) -> str:
     """Minúsculas sem acento (para montar e-mails fictícios)."""
     s = unicodedata.normalize("NFKD", texto.lower())
@@ -128,7 +133,7 @@ class Gerador:
     def dia(self, ano: int, mes_ini: int = 2, mes_fim: int = 11) -> pd.Timestamp:
         ini = pd.Timestamp(ano, mes_ini, 1)
         fim = pd.Timestamp(ano, mes_fim, 28)
-        return ini + pd.Timedelta(days=int(self.rng.integers(0, (fim - ini).days + 1)))
+        return _somar_dias(ini, int(self.rng.integers(0, (fim - ini).days + 1)))
 
     def num(self, v: float, casas: int = 1) -> str:
         """Número como texto; às vezes com vírgula decimal."""
@@ -222,7 +227,7 @@ class Gerador:
                     pid = self.escolha(profs)
                     modalidade = "Online" if unidade == "Online" else \
                         self.escolha(["Presencial", "Híbrido", "Online"], p=[.6, .3, .1])
-                    ini = pd.Timestamp(ano, 2, 1) + pd.Timedelta(days=int(self.rng.integers(0, 20)))
+                    ini = _somar_dias(pd.Timestamp(ano, 2, 1), int(self.rng.integers(0, 20)))
                     linhas.append({
                         "oferta_id": f"OF{i:04d}", "ano": str(ano),
                         "turma": f"{materia[:3].upper()}-{ano}-{unidade[:2].upper()}",
@@ -354,8 +359,9 @@ class Gerador:
                             tempo = s.x_total * 3 + float(self.rng.integers(5, 30))
                         if self.rng.random() < 0.03:
                             nota = float(self.rng.choice([-10, 101, 120, 150]))  # outlier
-                        inicio = self.dia(ano, 3, 11) + pd.Timedelta(hours=int(self.rng.integers(7, 20)),
-                                                                      minutes=int(self.rng.integers(0, 60)))
+                        d = self.dia(ano, 3, 11)
+                        inicio = pd.Timestamp(d.year, d.month, d.day, int(self.rng.integers(7, 20)),
+                                              int(self.rng.integers(0, 60)))
                         linha.update(nota=self.num(nota), acertos=str(acertos),
                                      tempo_finalizacao_min=self.num(tempo), inicio_simulado=self.data(inicio, hora=True))
                     linhas.append(linha)
@@ -378,7 +384,7 @@ class Gerador:
                     "chamada": self.sujo(self.escolha(list(SUJO["chamada"]), p=[.45, .2, .1, .15, .1]), SUJO["chamada"]),
                     "bolsa_aprovacao": self.sujo(self.escolha(["Não", "Sim", "Parcial"], p=[.6, .25, .15]), SUJO["sim_nao"])
                     if uni in ("UNIFOR",) else self.escolha(["Não", "nao", ""]),
-                    "data_resultado": self.data(pd.Timestamp(ano + 1, 1, 1) + pd.Timedelta(days=int(self.rng.integers(10, 60)))),
+                    "data_resultado": self.data(_somar_dias(pd.Timestamp(ano + 1, 1, 1), int(self.rng.integers(10, 60)))),
                     "nota_final_vestibular": self.num(float(np.clip(650 + 70 * a.aptidao + self.rng.normal(0, 40), 400, 1000))),
                     "campus": self.escolha(["Fortaleza", "fortaleza", "Sobral", "Juazeiro do Norte", "Crato"],
                                            p=[.6, .1, .1, .1, .1]),
