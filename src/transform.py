@@ -67,9 +67,23 @@ def _ler(nome: str) -> pd.DataFrame:
     return pd.read_csv(caminho, dtype=str, keep_default_na=False)
 
 
+# Marcador gravado pelo gerador de dados sintéticos (propagado pelo extract.py)
+MARCADOR_SINTETICO = "DADOS_SINTETICOS.txt"
+# Arquivo em data/final/ que diz ao dashboard de onde veio a base
+ARQUIVO_FONTE = "_fonte.txt"
+
+
+def modo_dados() -> str:
+    """'sintetica' (base fictícia), 'completa' (CSVs integrais) ou 'amostra' (XLSX)."""
+    if (IN_DIR / MARCADOR_SINTETICO).exists():
+        return "sintetica"
+    return "completa" if (IN_DIR / "matriculas.csv").exists() else "amostra"
+
+
 def fonte_dados() -> str:
-    """'base completa' se os CSVs completos foram extraídos; senão 'amostra'."""
-    return "base completa" if (IN_DIR / "matriculas.csv").exists() else "amostra"
+    """Descrição da fonte para o relatório."""
+    return {"sintetica": "base fictícia (dados sintéticos)", "completa": "base completa",
+            "amostra": "amostra"}[modo_dados()]
 
 def _int(s: pd.Series) -> pd.Series:
     return cl.to_num(s).round().astype("Int64")
@@ -246,6 +260,7 @@ def _salvar(df: pd.DataFrame, nome: str) -> None:
 
 def main() -> dict[str, pd.DataFrame]:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    _rel.clear()
     rel("# Relatório de tratamento — AprovaEdu Analytics\n")
     rel(f"Gerado por `src/transform.py` a partir da **{fonte_dados()}**. Correções "
         "aplicadas sobre `data/processed/` e base tratada salva em `data/final/`.\n")
@@ -280,7 +295,8 @@ def main() -> dict[str, pd.DataFrame]:
         rel(f"- `{nome}`: {len(df)} linhas × {len(df.columns)} colunas")
 
     (OUT_DIR / "_relatorio_tratamento.md").write_text("\n".join(_rel), encoding="utf-8")
-    print("\n🎉 Tratamento concluído! Base tratada em", OUT_DIR.relative_to(BASE_DIR))
+    (OUT_DIR / ARQUIVO_FONTE).write_text(modo_dados() + "\n", encoding="utf-8")
+    print("\n🎉 Tratamento concluído! Base tratada em", OUT_DIR)
     return tabelas
 
 

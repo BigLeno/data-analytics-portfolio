@@ -20,9 +20,9 @@ data/processed/_meta/.
 
 import shutil
 import sys
+from pathlib import Path
 
 import pandas as pd
-from pathlib import Path
 
 # O console do Windows costuma ser cp1252 e quebra ao imprimir os emojis dos
 # logs; garante saída UTF-8 em qualquer terminal.
@@ -38,6 +38,9 @@ OUTPUT_DIR = BASE_DIR / "data" / "processed"
 # Abas que são documentação (dicionário/catálogo), não tabelas analíticas
 META_SHEETS = {"Resumo", "Problemas_Qualidade"}
 
+# Gravado pelo scripts/gerar_dados_sinteticos.py: marca a base como fictícia
+MARCADOR_SINTETICO = "DADOS_SINTETICOS.txt"
+
 # Base completa: arquivo em data/raw/ -> nome canônico da tabela
 CSV_COMPLETOS = {
     "professores.csv": "professores",
@@ -50,6 +53,14 @@ CSV_COMPLETOS = {
     "aulas.csv": "aulas",
     "presencas_aulas.csv": "presencas_aulas",
 }
+
+
+def _rel(caminho: Path) -> Path:
+    """Caminho relativo ao projeto para os logs (absoluto se estiver fora dele)."""
+    try:
+        return caminho.relative_to(BASE_DIR)
+    except ValueError:
+        return caminho
 
 
 def extract_csvs_completos(raw_dir: Path, output_dir: Path) -> dict[str, Path]:
@@ -70,11 +81,19 @@ def extract_csvs_completos(raw_dir: Path, output_dir: Path) -> dict[str, Path]:
         with origem.open("rb") as f:
             linhas = sum(1 for _ in f) - 1  # desconta o cabeçalho
         written[tabela] = destino
-        rel = destino.relative_to(BASE_DIR)
+        rel = _rel(destino)
         print(f"✅ dado  {arquivo:28s} → {str(rel):38s} ({linhas} linhas)")
 
+    # Propaga (ou limpa) o marcador de base fictícia para as etapas seguintes
+    marcador = output_dir / MARCADOR_SINTETICO
+    if (raw_dir / MARCADOR_SINTETICO).exists():
+        shutil.copyfile(raw_dir / MARCADOR_SINTETICO, marcador)
+        print("🎲 Base FICTÍCIA (gerada por scripts/gerar_dados_sinteticos.py)")
+    else:
+        marcador.unlink(missing_ok=True)
+
     print("-" * 70)
-    print(f"🎉 Extração concluída! {len(written)} CSVs em {output_dir.relative_to(BASE_DIR)}")
+    print(f"🎉 Extração concluída! {len(written)} CSVs em {_rel(output_dir)}")
     return written
 
 
@@ -123,11 +142,11 @@ def extract_sheets(xlsx_path: Path, output_dir: Path) -> dict[str, Path]:
         written[sheet_name] = csv_path
 
         tag = "🗂  meta" if is_meta else "✅ dado"
-        rel = csv_path.relative_to(BASE_DIR)
+        rel = _rel(csv_path)
         print(f"{tag}  {sheet_name:24s} → {str(rel):42s} ({len(df)} linhas, {len(df.columns)} colunas)")
 
     print("-" * 70)
-    print(f"🎉 Extração concluída! {len(written)} CSVs em {output_dir.relative_to(BASE_DIR)}")
+    print(f"🎉 Extração concluída! {len(written)} CSVs em {_rel(output_dir)}")
     return written
 
 
