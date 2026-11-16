@@ -5,11 +5,14 @@ Gráficos são Plotly interativos (hover/zoom) — não imagens. As agregações
 Q3 vêm da camada SQL (DuckDB, `src/queries.py`) sobre os Parquet; Q2 é calculada em
 Pandas. Rodar: `streamlit run dashboard/app.py` (ou `docker compose up --build`).
 
-Observação: os dados disponíveis são amostrais — as análises são demonstração de
-método (ver README › Escopo dos dados).
+O painel identifica a fonte da base tratada (`data/final/_fonte.txt`): amostra do
+XLSX, base completa ou base fictícia. Sem nenhuma fonte em `data/raw/`, ele gera a
+base fictícia sozinho (scripts/gerar_dados_sinteticos.py) e roda o pipeline — é
+assim que a demo pública funciona.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -18,8 +21,12 @@ import plotly.graph_objects as go
 import streamlit as st
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-FINAL_DIR = BASE_DIR / "data" / "final"
+# APROVAEDU_DATA_DIR permite apontar o painel para outra pasta de dados (usado nos testes)
+DATA_DIR = Path(os.environ.get("APROVAEDU_DATA_DIR", BASE_DIR / "data"))
+FINAL_DIR = DATA_DIR / "final"
+RAW_DIR = DATA_DIR / "raw"
 sys.path.insert(0, str(BASE_DIR / "src"))
+sys.path.insert(0, str(BASE_DIR / "scripts"))
 
 # Paleta categórica validada (colorblind-safe) + tokens de tinta
 BLUE, ORANGE = "#2a78d6", "#eb6834"
@@ -38,6 +45,37 @@ def carregar_base() -> dict[str, pd.DataFrame] | None:
     if any(not (FINAL_DIR / f"{t}.parquet").exists() for t in TABELAS):
         return None
     return {t: pd.read_parquet(FINAL_DIR / f"{t}.parquet") for t in TABELAS}
+
+
+def modo_base() -> str:
+    """'sintetica', 'completa' ou 'amostra', conforme gravado pelo transform.py."""
+    arquivo = FINAL_DIR / "_fonte.txt"
+    if arquivo.exists():
+        return arquivo.read_text(encoding="utf-8").strip()
+    # bases tratadas antes do marcador: a amostra tinha no máx. 500 estudantes
+    est = FINAL_DIR / "estudantes.parquet"
+    return "completa" if est.exists() and len(pd.read_parquet(est)) > 500 else "amostra"
+
+
+def ha_fonte_bruta() -> bool:
+    """True se há XLSX de amostra ou algum CSV em data/raw/ (não sobrescrever dados reais)."""
+    import extract
+    return (RAW_DIR / extract.XLSX_PATH.name).exists() or \
+        any((RAW_DIR / f).exists() for f in extract.CSV_COMPLETOS)
+
+
+def preparar_demo() -> None:
+    """Gera a base fictícia em data/raw/ e roda extract + transform."""
+    import extract
+    import gerar_dados_sinteticos as gds
+    import transform
+    extract.RAW_DIR, extract.OUTPUT_DIR = RAW_DIR, DATA_DIR / "processed"
+    extract.XLSX_PATH = RAW_DIR / extract.XLSX_PATH.name
+    transform.IN_DIR, transform.OUT_DIR = DATA_DIR / "processed", FINAL_DIR
+    gds.gerar(RAW_DIR)
+    extract.main()
+    transform.main()
+    st.cache_data.clear()
 
 
 @st.cache_data(show_spinner=False)
@@ -62,6 +100,13 @@ def avaliar_modelo() -> dict:
 def importancia_modelo() -> pd.DataFrame:
     import model
     return model.importancia_variaveis(FINAL_DIR)
+
+
+def taxa_por_permanencia(matriculas: pd.DataFrame, aprovacoes: pd.DataFrame) -> pd.DataFrame:
+    """Taxa de aprovação por nº de anos distintos com matrícula."""
+    alunos = matriculas.groupby("aluno_id").agg(anos=("ano", "nunique"))
+    alunos["aprovado"] = alunos.index.isin(set(aprovacoes["aluno_id"]))
+    return alunos.groupby("anos")["aprovado"].agg(taxa="mean", n="count")
 
 
 def resumo_presenca(presencas: pd.DataFrame, aprovacoes: pd.DataFrame) -> pd.DataFrame:
@@ -178,9 +223,7 @@ def fig_modalidade_ano(ofertas: pd.DataFrame) -> go.Figure:
 
 
 def fig_persistencia(matriculas: pd.DataFrame, aprovacoes: pd.DataFrame) -> go.Figure:
-    alunos = matriculas.groupby("aluno_id").agg(anos=("ano", "nunique"))
-    alunos["aprovado"] = alunos.index.isin(set(aprovacoes["aluno_id"]))
-    p = alunos.groupby("anos")["aprovado"].agg(taxa="mean", n="count")
+    p = taxa_por_permanencia(matriculas, aprovacoes)
     t = go.Bar(x=[f"{int(a)} ano{'s' if a > 1 else ''}" for a in p.index],
                y=(p["taxa"] * 100).round(1), marker_color=BLUE,
                text=[f"{v*100:.1f}% (n={n})" for v, n in zip(p["taxa"], p["n"])],
@@ -232,29 +275,33 @@ def fig_score_dist(scores: pd.DataFrame) -> go.Figure:
 # Aplicação
 # --------------------------------------------------------------------------- #
 
+def _pct(v: float) -> str:
+    return f"{v:.1f}".replace(".", ",") + "%"
+
+
 def main() -> None:
     st.set_page_config(page_title="AprovaEdu Analytics", page_icon="📊", layout="wide")
 
     base = carregar_base()
+    if base is None and not ha_fonte_bruta():
+        with st.spinner("Gerando a base fictícia e rodando o pipeline (primeiro acesso)…"):
+            preparar_demo()
+        base = carregar_base()
     if base is None:
         st.title("📊 AprovaEdu Analytics")
-        xlsx = BASE_DIR / "data" / "raw" / "base_pre_vestibular_dicionario_amostras.xlsx"
-        if not xlsx.exists():
-            st.error(
-                "**Arquivo de origem ausente.** Coloque "
-                "`base_pre_vestibular_dicionario_amostras.xlsx` em `data/raw/` e rode o pipeline:\n\n"
-                "```\npython src/extract.py\npython src/transform.py\n```"
-            )
-        else:
-            st.error(
-                "Base tratada não encontrada em `data/final/`. Rode o pipeline:\n\n"
-                "```\npython src/extract.py\npython src/transform.py\n```"
-            )
+        st.error(
+            "Base tratada não encontrada em `data/final/`. Rode o pipeline:\n\n"
+            "```\npython src/extract.py\npython src/transform.py\n```\n\n"
+            "Sem dados? Gere uma base fictícia com `python scripts/gerar_dados_sinteticos.py`."
+        )
         st.stop()
 
+    modo = modo_base()
+    real = modo == "completa"            # números e textos da base completa original
+    completa = modo != "amostra"         # tabelas inteiras (completa ou fictícia)
+    ficticia = modo == "sintetica"
+
     aprov, pres = base["aprovacoes"], base["presencas_aulas"]
-    # Fonte dos dados: a amostra trazia no máx. 500 estudantes; a base completa traz 812.
-    completa = base["estudantes"]["aluno_id"].nunique() > 500
 
     # ---- Sidebar ----
     with st.sidebar:
@@ -271,7 +318,15 @@ def main() -> None:
 
     # ---- Cabeçalho + escopo ----
     st.title("📊 AprovaEdu Analytics")
-    if completa:
+    if ficticia:
+        st.info(
+            "**Dados fictícios.** Esta demonstração roda sobre uma base sintética gerada por "
+            "`scripts/gerar_dados_sinteticos.py`, com a mesma estrutura e os mesmos problemas de "
+            "qualidade da base original. Nomes, CPFs e números são inventados e não representam "
+            "nenhuma instituição real.",
+            icon="🎲",
+        )
+    elif real:
         st.success(
             "**Base completa.** Painel alimentado pelos CSVs integrais (812 estudantes, "
             "9.452 matrículas, 74.997 presenças) — os números são **conclusões de negócio**. "
@@ -295,54 +350,64 @@ def main() -> None:
     aba1, aba2, aba3, aba4, aba5, aba6 = st.tabs([
         "Q1 · Aprovação por ano", "Q2 · Presença × aprovação",
         "Q3 · Desempenho por matéria", "Q4 · Recomendações",
-        "★ Insights (dados completos)", "🧠 Score (ML)",
+        "★ Insights", "🧠 Score (ML)",
     ])
 
     with aba1:
         q1f = q1[q1["ano"].astype(int).isin(anos)] if anos else q1
         col1, col2 = st.columns(2)
         if completa:
-            col1.plotly_chart(fig_taxa(q1f), use_container_width=True)
-            col2.plotly_chart(fig_nota(q1f), use_container_width=True)
-            st.plotly_chart(fig_aprovacoes(q1f), use_container_width=True)
-            st.caption("A taxa oscila entre ~30% e ~36% sem tendência clara; o volume de "
-                       "aprovados cresce junto com a base de matriculados. Fonte: consulta SQL (DuckDB).")
+            col1.plotly_chart(fig_taxa(q1f), width="stretch")
+            col2.plotly_chart(fig_nota(q1f), width="stretch")
+            st.plotly_chart(fig_aprovacoes(q1f), width="stretch")
+            if real:
+                st.caption("A taxa oscila entre ~30% e ~36% sem tendência clara; o volume de "
+                           "aprovados cresce junto com a base de matriculados. Fonte: consulta SQL (DuckDB).")
+            elif len(q1f):
+                st.caption(f"Taxa de aprovação entre {_pct(q1f['taxa_pct'].min())} e "
+                           f"{_pct(q1f['taxa_pct'].max())} nos anos selecionados. Fonte: consulta SQL (DuckDB).")
         else:
-            col1.plotly_chart(fig_aprovacoes(q1f), use_container_width=True)
-            col2.plotly_chart(fig_nota(q1f), use_container_width=True)
+            col1.plotly_chart(fig_aprovacoes(q1f), width="stretch")
+            col2.plotly_chart(fig_nota(q1f), width="stretch")
             st.caption("A *taxa* (aprovados ÷ matriculados) exige a base completa — o denominador "
                        "amostral é truncado. Fonte: consulta SQL (DuckDB).")
         with st.expander("Ver dados (tabela)"):
-            st.dataframe(q1f, hide_index=True, use_container_width=True)
+            st.dataframe(q1f, hide_index=True, width="stretch")
 
     with aba2:
         resumo = resumo_presenca(pres, aprov)
-        st.plotly_chart(fig_presenca(resumo), use_container_width=True)
-        if completa:
+        st.plotly_chart(fig_presenca(resumo), width="stretch")
+        if real:
             st.caption("Na base completa a presença média é **praticamente idêntica** entre "
                        "aprovados e não aprovados (~84%) — **não há associação** entre presença "
                        "e aprovação nestes dados (r≈0, p≈0,86).")
+        elif ficticia:
+            medias = resumo.set_index("grupo")["media_pct"]
+            st.caption("Presença média: " + " · ".join(f"{g} {_pct(v)}" for g, v in medias.items())
+                       + ". Na base fictícia a presença entra com peso pequeno na chance de aprovação.")
         else:
             st.caption("Direção plausível (aprovados com presença maior), mas amostra ínfima não "
                        "permite afirmar associação.")
         with st.expander("Ver dados (tabela)"):
-            st.dataframe(resumo[["grupo", "media_pct", "alunos"]], hide_index=True,
-                         use_container_width=True)
+            st.dataframe(resumo[["grupo", "media_pct", "alunos"]], hide_index=True, width="stretch")
 
     with aba3:
         q3 = q3_por_materia()
-        st.plotly_chart(fig_materia(q3), use_container_width=True)
-        if completa:
+        st.plotly_chart(fig_materia(q3), width="stretch")
+        if real:
             st.caption("Desempenho **homogêneo** entre as 10 matérias (médias entre ~60,7 e ~62,0) "
                        "— nenhuma matéria destoa. Fonte: consulta SQL (DuckDB).")
+        elif ficticia:
+            st.caption(f"Médias entre {q3['nota_media'].min():.1f} e {q3['nota_media'].max():.1f} "
+                       f"nas {len(q3)} matérias. Fonte: consulta SQL (DuckDB).")
         else:
             st.caption("Ranking ilustrativo — a amostra cobre poucas matérias. Fonte: consulta SQL (DuckDB).")
         with st.expander("Ver dados (tabela)"):
-            st.dataframe(q3, hide_index=True, use_container_width=True)
+            st.dataframe(q3, hide_index=True, width="stretch")
 
     with aba4:
         st.subheader("Recomendações para a coordenação")
-        if completa:
+        if real:
             st.markdown(
                 "1. **Retenção é a alavanca nº 1** — a chance de aprovação eventual salta de "
                 "31,6% (1 ano) para 54,6% (2 anos) e 87,5% (3 anos); priorizar rematrícula, "
@@ -361,43 +426,51 @@ def main() -> None:
                     "notebook 06 — persistência).", icon="🧭")
         else:
             st.markdown(
-                "1. **Monitorar presença como sinal de risco** — acompanhar frequência por "
-                "aluno/turma e acionar quedas.\n"
-                "2. **Reforçar as matérias de menor nota média** em simulados (carga horária, revisões).\n"
-                "3. **Padronizar a captura de dados na origem** — reduz o retrabalho de limpeza e "
+                "1. **Acompanhar a permanência** — medir a aprovação por anos de cursinho e agir "
+                "sobre quem encerra o ano sem aprovação.\n"
+                "2. **Monitorar presença** por aluno e turma, como gestão e sinal de risco.\n"
+                "3. **Reforçar as matérias de menor nota média** em simulados (carga horária, revisões).\n"
+                "4. **Padronizar a captura de dados na origem** — reduz o retrabalho de limpeza e "
                 "melhora a qualidade decisória.\n"
-                "4. **Instrumentar a taxa de aprovação por coorte** (ingresso × vestibular) para "
+                "5. **Instrumentar a taxa de aprovação por coorte** (ingresso × vestibular) para "
                 "separar efeitos de turma, matéria e presença."
             )
-            st.info("Recomendações derivadas do método; a confirmar na base completa.", icon="🧭")
+            if ficticia:
+                st.info("Com dados fictícios, as recomendações mostram o tipo de decisão que o "
+                        "painel apoia; os números das outras abas não são da base real.", icon="🧭")
+            else:
+                st.info("Recomendações derivadas do método; a confirmar na base completa.", icon="🧭")
 
     with aba5:
+        of = base["ofertas_curso"]
         if completa:
-            st.success(
-                "Análises complementares sobre **aprovações** e **ofertas** — perfil de ingresso "
-                "e organização do cursinho.", icon="✅",
-            )
+            st.plotly_chart(fig_persistencia(base["matriculas"], aprov), width="stretch")
+            if real:
+                st.caption("**Persistência é o fator nº 1**: a chance de aprovação eventual salta de "
+                           "31,6% (1 ano) para 87,5% (3 anos) — parte é efeito de mais tentativas, "
+                           "mas o 3º ano excede o esperado mecânico em ~20 p.p. (notebook 06).")
+            else:
+                pt = taxa_por_permanencia(base["matriculas"], aprov)["taxa"] * 100
+                st.caption("Aprovação por anos de permanência: "
+                           + " · ".join(f"{int(a)} ano{'s' if a > 1 else ''} {_pct(v)}" for a, v in pt.items()))
         else:
             st.success(
                 "Estas análises usam apenas tabelas **completas** (`aprovacoes`, `ofertas_curso`) — "
                 "valem como **conclusões**, sem a ressalva amostral das abas Q1–Q4.", icon="✅",
             )
-        of = base["ofertas_curso"]
-        if completa:
-            st.plotly_chart(fig_persistencia(base["matriculas"], aprov), use_container_width=True)
-            st.caption("**Persistência é o fator nº 1**: a chance de aprovação eventual salta de "
-                       "31,6% (1 ano) para 87,5% (3 anos) — parte é efeito de mais tentativas, "
-                       "mas o 3º ano excede o esperado mecânico em ~20 p.p. (notebook 06).")
         col1, col2 = st.columns(2)
-        col1.plotly_chart(fig_universidades(aprov), use_container_width=True)
-        col2.plotly_chart(fig_tipo_vaga(aprov), use_container_width=True)
-        st.plotly_chart(fig_modalidade_ano(of), use_container_width=True)
-        st.caption("Público majoritariamente cotista (cotas somadas > ampla concorrência), "
-                   "destino concentrado em públicas locais (UECE, UFC) e mix de modalidade "
-                   "que varia por ano sem tendência linear.")
+        col1.plotly_chart(fig_universidades(aprov), width="stretch")
+        col2.plotly_chart(fig_tipo_vaga(aprov), width="stretch")
+        st.plotly_chart(fig_modalidade_ano(of), width="stretch")
+        if real:
+            st.caption("Público majoritariamente cotista (cotas somadas > ampla concorrência), "
+                       "destino concentrado em públicas locais (UECE, UFC) e mix de modalidade "
+                       "que varia por ano sem tendência linear.")
 
     with aba6:
-        if completa:
+        m = avaliar_modelo()
+        seg = m["segmentacao"].set_index("faixa")["taxa_aprovacao_real"]
+        if real:
             st.success(
                 "Score treinado na **base completa** (800 alunos com features): AUC ~0,61 e "
                 "segmentação com poder real — a faixa **Alta** concentra ~62% de aprovação "
@@ -405,6 +478,10 @@ def main() -> None:
                 "coeficiente dominante, é reflexo dos anos cursados — ver notebook 06).",
                 icon="🧠",
             )
+        elif ficticia:
+            faixas = " · ".join(f"{f} {_pct(v * 100)}" for f, v in seg.items())
+            st.info(f"Score treinado na base fictícia ({m['n']} alunos com features), AUC "
+                    f"{m['auc_logit'][0]:.2f}. Aprovação real por faixa de score: {faixas}.", icon="🧠")
         else:
             st.warning(
                 "Modelo em **demonstração**: o alvo é confiável (aprovações completas), mas as "
@@ -412,24 +489,27 @@ def main() -> None:
                 "(AUC ~0,5). O entregável é o *pipeline* interpretável, pronto para a base completa.",
                 icon="⚠️",
             )
-        m = avaliar_modelo()
         k1, k2, k3 = st.columns(3)
         k1.metric("Alunos (com features)", f"{m['n']}")
         k2.metric("AUC · Regressão logística", f"{m['auc_logit'][0]:.3f}")
         k3.metric("AUC · Random forest", f"{m['auc_rf'][0]:.3f}")
         col1, col2 = st.columns(2)
-        col1.plotly_chart(fig_importancia(m["coefs"]), use_container_width=True)
-        col2.plotly_chart(fig_score_dist(m["scores"]), use_container_width=True)
-        st.plotly_chart(fig_importancia_perm(importancia_modelo()), use_container_width=True)
-        st.caption("**Importância formal de cada variável**: embaralho uma variável por vez e "
-                   "meço quanto o AUC cai. `n_matriculas` (proxy da permanência) carrega quase "
-                   "todo o sinal; `taxa_presenca` e `nota_sim_media` têm importância ≈ zero — "
-                   "confirmação formal, no modelo, dos achados de Q2 e Q3.")
+        col1.plotly_chart(fig_importancia(m["coefs"]), width="stretch")
+        col2.plotly_chart(fig_score_dist(m["scores"]), width="stretch")
+        st.plotly_chart(fig_importancia_perm(importancia_modelo()), width="stretch")
+        if real:
+            st.caption("**Importância formal de cada variável**: embaralho uma variável por vez e "
+                       "meço quanto o AUC cai. `n_matriculas` (proxy da permanência) carrega quase "
+                       "todo o sinal; `taxa_presenca` e `nota_sim_media` têm importância ≈ zero — "
+                       "confirmação formal, no modelo, dos achados de Q2 e Q3.")
+        else:
+            st.caption("**Importância de cada variável**: embaralho uma variável por vez e meço "
+                       "quanto o AUC cai — quanto maior a queda, mais o modelo depende dela.")
         st.markdown("**Segmentação por faixa de score** — a faixa ordena a taxa real de aprovação?")
-        st.dataframe(m["segmentacao"], hide_index=True, use_container_width=True)
+        st.dataframe(m["segmentacao"], hide_index=True, width="stretch")
         with st.expander("Ver score por aluno"):
             st.dataframe(m["scores"].sort_values("score", ascending=False),
-                         hide_index=True, use_container_width=True)
+                         hide_index=True, width="stretch")
 
 
 if __name__ == "__main__":
