@@ -1,5 +1,11 @@
 # 📊 AprovaEdu Analytics
 
+[![CI](https://github.com/BigLeno/data-analytics-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/BigLeno/data-analytics-portfolio/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.10%20|%203.12%20|%203.13-3776AB?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-dashboard-FF4B4B?logo=streamlit&logoColor=white)
+![DuckDB](https://img.shields.io/badge/DuckDB-SQL-FFF000?logo=duckdb&logoColor=black)
+![Docker](https://img.shields.io/badge/Docker-GHCR-2496ED?logo=docker&logoColor=white)
+
 Pipeline analítico para análise de dados educacionais de cursinho pré-vestibular (2021-2025).
 
 ## 🎯 Sobre o Projeto
@@ -8,17 +14,20 @@ Projeto de análise de dados educacionais desenvolvido como solução para o des
 
 ## 🛠️ Stack
 
-- **Python 3.11+**
+- **Python 3.10+**
 - **Pandas / NumPy** — Manipulação de dados
 - **DuckDB** — Consultas SQL in-memory
 - **Pandera** — Validação de schema
 - **scikit-learn** — Modelo de propensão (score)
 - **Plotly / Streamlit** — Visualização
-- **Docker** — Ambiente reproduzível
+- **pytest + GitHub Actions** — Testes e CI
+- **Docker** — Ambiente reproduzível (imagem publicada no GHCR)
 
 ## 🖥️ Demonstração — dashboard
 
-Painel interativo (Streamlit + Plotly) com as 4 análises, os insights complementares e o score de propensão — os textos e a taxa de aprovação se adaptam à fonte carregada (amostra ou base completa). Para rodar, veja *Como Executar* (ou `docker compose up --build`) e acesse http://localhost:8501.
+Painel interativo (Streamlit + Plotly) com as 4 análises, os insights complementares e o score de propensão. Os textos se adaptam à fonte carregada: amostra, base completa ou **base fictícia**. Para rodar, veja *Como Executar* (ou `docker compose up --build`) e acesse http://localhost:8501.
+
+> **Dados fictícios na demo.** A base original não é pública. Sem nenhuma fonte em `data/raw/`, o painel gera sozinho uma base sintética (`scripts/gerar_dados_sinteticos.py`) e roda o pipeline inteiro sobre ela, com um aviso de "Dados fictícios" no topo. Os prints abaixo são da base completa original.
 
 **Visão geral e análises obrigatórias**
 
@@ -49,6 +58,8 @@ O projeto foi desenvolvido em **duas fases**, e isso estrutura os entregáveis:
 | Q3 · matérias | 2 visíveis | **10, desempenho homogêneo (60,7–62,0)** |
 | Score ML (AUC) | ~0,51 (acaso) | **~0,61**; faixa Alta com 62% de aprovação real |
 | Validação (Pandera) | regras passando | **capturou outlier novo** (nota_diagnostico > 100) |
+
+**Base fictícia (demo e testes).** Para o projeto rodar sem os dados originais, `scripts/gerar_dados_sinteticos.py` cria os 9 CSVs brutos com o mesmo layout e **os mesmos problemas de qualidade**: datas em formatos mistos, categorias com caixa, acento e abreviação variados, CPFs com e sem máscara, vírgula decimal, notas fora de faixa, PKs repetidas, nomes de professor divergentes do cadastro e linhas `"Cadastro duplicado?"`. Nomes, CPFs e contatos são inventados. A aprovação segue um modelo simples (aptidão + anos de permanência), então as análises e o score têm sinal, mas **os números da demo não são conclusões** sobre nenhuma instituição.
 
 > O ponto central: **nenhuma linha de método mudou entre as fases** — só a fonte dos dados. A honestidade da Fase 1 (declarar o que a amostra não sustentava) foi validada pela Fase 2: a diferença de presença que parecia existir na amostra era ruído.
 
@@ -82,8 +93,12 @@ reports/
   relatorio_final.md    # relatório definitivo (base completa)
   relatorio_amostra.md  # registro da fase amostral (Fase 1)
   img/          # gráficos usados nos relatórios
+scripts/
+  gerar_dados_sinteticos.py  # base fictícia nos 9 CSVs brutos (demo e testes)
+tests/          # pytest: limpeza, gerador, pipeline, validação, SQL, modelo e painel
 docs/
   screenshots/  # prints do dashboard (usados na seção Demonstração)
+.github/workflows/ci.yml     # lint, testes (3.10/3.12/3.13), Docker e GHCR
 ```
 
 > `data/raw`, `data/processed` e `data/final` são ignorados pelo Git; as saídas são regeneráveis pelo pipeline.
@@ -95,7 +110,8 @@ docs/
 ```bash
 python -m venv env
 # Windows: env\Scripts\activate | Linux/Mac: source env/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt        # pipeline + dashboard
+pip install -r requirements-dev.txt    # + testes, lint e notebooks
 ```
 
 ### Dados (obrigatório)
@@ -106,6 +122,13 @@ Os dados brutos **não são versionados** (boa prática) — são distribuídos 
 - **Amostra:** o XLSX `base_pre_vestibular_dicionario_amostras.xlsx` (dicionário + amostras).
 
 As pastas `data/processed/` e `data/final/` são criadas automaticamente pelo pipeline.
+
+**Sem os dados originais?** Gere a base fictícia (o extract a reconhece como base completa e o painel mostra o aviso de dados fictícios):
+
+```bash
+python scripts/gerar_dados_sinteticos.py              # ~800 alunos, seed 42
+python scripts/gerar_dados_sinteticos.py --alunos 200 --seed 7
+```
 
 ### Pipeline (do bruto à base tratada)
 
@@ -129,12 +152,37 @@ jupyter notebook
 
 ### Docker
 
-O container **executa o pipeline (extract → transform) e sobe o dashboard automaticamente** — basta o XLSX estar em `data/raw/` (ver *Dados*).
+O container **executa o pipeline (extract → transform) e sobe o dashboard automaticamente** sobre o que estiver em `data/raw/`. Com a pasta vazia, o painel gera a base fictícia no primeiro acesso.
 
 ```bash
 docker compose up --build   # dashboard em http://localhost:8501
-# Docker V1 antigo: docker-compose up --build
 ```
+
+A imagem roda com usuário sem privilégios, tem healthcheck e é publicada no GitHub Container Registry a cada merge na `main`:
+
+```bash
+docker run -p 8501:8501 ghcr.io/bigleno/data-analytics-portfolio:latest
+```
+
+### Streamlit Community Cloud
+
+Basta criar o app apontando para este repositório, branch `main` e arquivo `dashboard/app.py`. O Cloud instala o `requirements.txt` e, como não há dados no repositório, o painel gera a base fictícia no primeiro acesso.
+
+## 🧪 Testes e CI
+
+```bash
+pip install -r requirements-dev.txt
+pytest          # testes de unidade e integração
+ruff check src scripts tests dashboard
+```
+
+Os testes geram uma base fictícia pequena, rodam o pipeline de ponta a ponta e conferem: normalização (datas, categorias, CPF, números), validação Pandera (inclusive que ela **acusa** uma categoria fora do canônico), PKs únicas, outliers anulados, integridade referencial, consultas SQL, o score de propensão e o painel (Streamlit `AppTest`, incluindo a geração automática da demo e a garantia de que ele não sobrescreve dados existentes).
+
+| Job | O que valida |
+| --- | --- |
+| `lint` | ruff |
+| `test` | pytest com cobertura no Python 3.10, 3.12 e 3.13, mais o pipeline completo sobre a base fictícia (o relatório de tratamento vai para o resumo do job) |
+| `docker` | hadolint, build, smoke test (saúde, usuário sem privilégios, pipeline dentro da imagem) e publicação no GHCR na `main` |
 
 ## 🔍 Decisões técnicas e analíticas
 
