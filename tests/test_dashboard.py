@@ -1,10 +1,11 @@
 import shutil
+from pathlib import Path
 
 import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
-APP = "dashboard/app.py"
+APP = str(Path(__file__).resolve().parent.parent / "dashboard" / "app.py")
 
 
 @pytest.fixture(autouse=True)
