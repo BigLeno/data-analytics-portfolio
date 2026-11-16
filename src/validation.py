@@ -11,11 +11,16 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pandera as pa
-from pandera import Check, Column, DataFrameSchema
+try:  # pandera >= 0.24 separa a API de pandas em pandera.pandas
+    import pandera.pandas as pa
+except ImportError:  # pragma: no cover - versões antigas
+    import pandera as pa
+from pandera.errors import SchemaErrors
+
+Check, Column, DataFrameSchema = pa.Check, pa.Column, pa.DataFrameSchema
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import cleaning as cl
+import cleaning as cl  # noqa: E402
 
 NI = "Não informado"
 _MATERIA = sorted(set(cl.MATERIA.values()))
@@ -125,7 +130,7 @@ def validar(tabelas: dict) -> dict[str, list[str]]:
             continue
         try:
             schema.validate(tabelas[nome], lazy=True)
-        except pa.errors.SchemaErrors as e:
+        except SchemaErrors as e:
             erros[nome] = e.failure_cases[["column", "check", "failure_case"]].astype(str) \
                 .drop_duplicates().apply(lambda r: f"{r['column']} | {r['check']} | {r['failure_case']}", axis=1).tolist()
     return erros
