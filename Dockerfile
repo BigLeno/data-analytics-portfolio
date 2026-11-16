@@ -1,23 +1,25 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
-# Instalar dependências do sistema
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copiar requirements e instalar
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-# Copiar código
 COPY . .
 
-# Expor porta do Streamlit
-EXPOSE 8501
+# Usuário sem privilégios, dono só da pasta de dados (onde o pipeline grava)
+RUN useradd --create-home --uid 1000 app && chown -R app:app /app/data
+USER app
 
-# Comando padrão: roda o pipeline (extract -> transform) e sobe o dashboard.
-# Se o XLSX não estiver em data/raw/, o pipeline é pulado e o painel exibe instruções.
-CMD ["sh", "-c", "python src/extract.py && python src/transform.py || echo '⚠️  Pipeline não executado (XLSX ausente em data/raw/?) — o painel exibirá as instruções.'; exec streamlit run dashboard/app.py --server.address=0.0.0.0"]
+EXPOSE 8501
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health')"
+
+# Roda o pipeline sobre o que houver em data/raw/ e sobe o painel. Sem nenhuma fonte,
+# o painel gera a base fictícia sozinho no primeiro acesso.
+CMD ["sh", "-c", "python src/extract.py && python src/transform.py || echo 'Sem dados em data/raw/: o painel vai gerar a base fictícia.'; exec streamlit run dashboard/app.py --server.address=0.0.0.0 --server.headless=true"]
